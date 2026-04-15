@@ -53,10 +53,10 @@ BrainPass provides AI agents with persistent, citeable memory using local-first 
 - `sources/` — External materials
 
 **LLM Layer:** Provider-agnostic interface supporting:
-- Groq (Kimi K2, Llama 3.3 70B)
-- OpenAI (GPT-4, GPT-3.5)
-- Anthropic (Claude Opus, Sonnet)
-- Local models (Ollama, vLLM)
+- Groq (GPT-OSS-120B, Llama 3.3 70B)
+- OpenAI (GPT-4o, GPT-4o-mini)
+- Anthropic (Claude 3.5 Sonnet, Claude 3.5 Haiku)
+- Local models (Ollama, vLLM, any OpenAI-compatible endpoint)
 
 ### 3. Implementation
 
@@ -94,7 +94,7 @@ Environment-based configuration enables provider switching:
 # ~/.env
 LLM_PROVIDER=groq
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=moonshotai/kimi-k2-instruct-0905
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 Headers and payloads adapt per provider (OpenAI-compatible vs. Anthropic format).
@@ -135,7 +135,7 @@ curl -s -X POST http://127.0.0.1:7778/recall \
 
 ### 6. Evaluation
 
-**Performance:** Local search (784 files) completes in <100ms. LLM compilation adds 1-3s depending on provider.
+**Performance:** Local keyword search over typical personal vaults (hundreds of files) completes in well under 100ms — the inner loop is `rglob` plus Python string counting. LLM compilation dominates end-to-end latency and adds 1-3s depending on provider and model.
 
 **Recall Accuracy:** Citation accuracy depends on vault structure. Well-organized vaults with clear file names and links yield higher relevance.
 
@@ -159,13 +159,13 @@ The system is intentionally simple — complexity emerges from vault organizatio
 
 ### References
 
-1. Mengali, S. (2026). *BrainPass: A Local-First Agent Memory System*. GitHub: https://github.com/coderook520/BrainPass
+1. coderook520. (2026). *BrainPass: A Local-First Agent Memory System*. GitHub: https://github.com/coderook520/BrainPass
 2. OpenAI. (2024). *GPT-4 Technical Report*.
 3. Anthropic. (2024). *Claude 3 Model Card*.
-4. Groq. (2026). *Kimi K2 on Groq Documentation*.
+4. Groq. (2026). *GPT-OSS-120B on Groq Documentation*.
 
 ---
 
-**Author:** Samir (coderook520)  
+**Author:** coderook520  
 **Date:** April 2026  
 **License:** MIT

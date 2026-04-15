@@ -1,0 +1,12 @@
+# BrainPass — dependencies
+#
+# The librarian uses Python standard library only:
+#   http.server, urllib.request, json, pathlib, re, signal
+#
+# No pip install required. This file exists so tooling that expects a
+# requirements.txt doesn't get confused.
+#
+# If you want to extend BrainPass with optional niceties, add them below:
+#   requests        — if you prefer it over urllib
+#   rich            — for pretty CLI output
+#   watchdog        — for live vault reindexing

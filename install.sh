@@ -1,44 +1,99 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # BrainPass Installation Script
+#
+# Installs BrainPass to ~/BrainPass/ from the cloned repo:
+#   - copies src/ and docs/ (always — so you can upgrade via `git pull && ./install.sh`)
+#   - copies config/ (only on first install — preserves your edits)
+#   - creates a fresh vault skeleton (only if the vault is empty)
+#   - creates the .env and SOUL.md live files from templates
+#   - writes a systemd --user service so the librarian auto-starts
+#
+# Safe to re-run. Idempotent on user data.
 
-set -e
+set -euo pipefail
 
-echo "🧠 BrainPass Installer"
-echo "======================"
+REPO_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+INSTALL_DIR="$HOME/BrainPass"
 
-# Check Python
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 not found. Please install Python 3.10+"
+echo "BrainPass Installer"
+echo "==================="
+echo "source: $REPO_ROOT"
+echo "target: $INSTALL_DIR"
+echo
+
+# ─── Python check ────────────────────────────────────────────────────
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 not found. Install Python 3.10 or newer." >&2
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
-echo "✓ Python version: $PYTHON_VERSION"
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+    FOUND=$(python3 --version 2>&1)
+    echo "ERROR: Python 3.10+ required. Found: $FOUND" >&2
+    exit 1
+fi
+echo "[ok] $(python3 --version)"
 
-# Create directories
-echo "📁 Creating directories..."
-mkdir -p ~/BrainPass/{vault/{daily,topics,people,projects,sources},cache}
+# ─── Target dirs ─────────────────────────────────────────────────────
+mkdir -p "$INSTALL_DIR"
+mkdir -p "$HOME/.config/systemd/user"
 
-# Copy config if not exists
-if [ ! -f ~/BrainPass/config/.env ]; then
-    echo "⚙️  Copying .env.example to .env..."
-    cp ~/BrainPass/config/.env.example ~/BrainPass/config/.env
-    echo "📝 Please edit ~/BrainPass/config/.env with your API keys"
+# ─── Copy source (always, so upgrades work) ──────────────────────────
+echo "[..] copying src/"
+rm -rf "$INSTALL_DIR/src"
+cp -r "$REPO_ROOT/src" "$INSTALL_DIR/src"
+chmod +x "$INSTALL_DIR/src/librarian.py"
+
+if [ -d "$REPO_ROOT/docs" ]; then
+    echo "[..] copying docs/"
+    rm -rf "$INSTALL_DIR/docs"
+    cp -r "$REPO_ROOT/docs" "$INSTALL_DIR/docs"
 fi
 
-# Copy identity files if not exists
-if [ ! -f ~/BrainPass/config/identity/SOUL.md ]; then
-    echo "📄 Copying SOUL.md.template to SOUL.md..."
-    cp ~/BrainPass/config/identity/SOUL.md.template ~/BrainPass/config/identity/SOUL.md
-    echo "📝 Please edit ~/BrainPass/config/identity/SOUL.md with your agent's identity"
+# ─── Copy config (preserve user edits) ───────────────────────────────
+if [ ! -d "$INSTALL_DIR/config" ]; then
+    echo "[..] copying config/ (first install)"
+    cp -r "$REPO_ROOT/config" "$INSTALL_DIR/config"
+else
+    echo "[ok] config/ already present — keeping your edits"
+    # Always sync the .example/.template files so new users of this install get updates
+    cp "$REPO_ROOT/config/.env.example" "$INSTALL_DIR/config/.env.example"
+    cp "$REPO_ROOT/config/identity/SOUL.md.template" "$INSTALL_DIR/config/identity/SOUL.md.template"
+    cp "$REPO_ROOT/config/identity/MEMORY.md.template" "$INSTALL_DIR/config/identity/MEMORY.md.template"
 fi
 
-# Make librarian executable
-chmod +x ~/BrainPass/src/librarian.py
+# ─── Live .env from template ─────────────────────────────────────────
+if [ ! -f "$INSTALL_DIR/config/.env" ]; then
+    cp "$INSTALL_DIR/config/.env.example" "$INSTALL_DIR/config/.env"
+    echo "[ok] created config/.env — EDIT IT with your API key"
+fi
 
-# Create systemd service file
-echo "🔧 Creating systemd service..."
-cat > ~/.config/systemd/user/brainpass-librarian.service << 'EOF'
+# ─── Live SOUL.md and MEMORY.md from templates ───────────────────────
+if [ ! -f "$INSTALL_DIR/config/identity/SOUL.md" ]; then
+    cp "$INSTALL_DIR/config/identity/SOUL.md.template" "$INSTALL_DIR/config/identity/SOUL.md"
+    echo "[ok] created config/identity/SOUL.md — edit to set your agent's personality"
+fi
+if [ ! -f "$INSTALL_DIR/config/identity/MEMORY.md" ]; then
+    cp "$INSTALL_DIR/config/identity/MEMORY.md.template" "$INSTALL_DIR/config/identity/MEMORY.md"
+    echo "[ok] created config/identity/MEMORY.md"
+fi
+
+# ─── Vault skeleton ──────────────────────────────────────────────────
+mkdir -p "$INSTALL_DIR/vault"/{daily,topics,people,projects,sources}
+
+# If the vault is fresh, seed it with two starter notes so Obsidian opens to something real
+if [ ! -f "$INSTALL_DIR/vault/daily/WELCOME.md" ] && [ -f "$REPO_ROOT/vault/daily/EXAMPLE.md" ]; then
+    cp "$REPO_ROOT/vault/daily/EXAMPLE.md" "$INSTALL_DIR/vault/daily/WELCOME.md"
+fi
+if [ ! -f "$INSTALL_DIR/vault/people/EXAMPLE.md" ] && [ -f "$REPO_ROOT/vault/people/EXAMPLE.md" ]; then
+    cp "$REPO_ROOT/vault/people/EXAMPLE.md" "$INSTALL_DIR/vault/people/EXAMPLE.md"
+fi
+
+# ─── systemd --user service ──────────────────────────────────────────
+SERVICE_FILE="$HOME/.config/systemd/user/brainpass-librarian.service"
+PYTHON_BIN="$(command -v python3)"
+
+cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=BrainPass Librarian — Agent Memory Service
 After=network.target
@@ -48,7 +103,7 @@ Type=simple
 Restart=always
 RestartSec=5
 EnvironmentFile=%h/BrainPass/config/.env
-ExecStart=/usr/bin/python3 %h/BrainPass/src/librarian.py serve
+ExecStart=$PYTHON_BIN %h/BrainPass/src/librarian.py serve
 StandardOutput=journal
 StandardError=journal
 
@@ -56,18 +111,27 @@ StandardError=journal
 WantedBy=default.target
 EOF
 
-# Reload systemd
-systemctl --user daemon-reload
+echo "[ok] wrote $SERVICE_FILE"
 
-echo ""
-echo "✅ BrainPass installed!"
-echo ""
-echo "Next steps:"
-echo "1. Edit ~/BrainPass/config/.env with your API keys"
-echo "2. Edit ~/BrainPass/config/identity/SOUL.md with your agent's identity"
-echo "3. Start the service: systemctl --user start brainpass-librarian"
-echo "4. Check status: curl http://127.0.0.1:7778/status"
-echo ""
-echo "For Obsidian integration:"
-echo "- Open Obsidian → 'Open another vault' → Select ~/BrainPass/vault/"
-echo ""
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user daemon-reload || true
+else
+    echo "[warn] systemctl not found — service file written but not registered"
+fi
+
+# ─── Summary ─────────────────────────────────────────────────────────
+cat <<EOF
+
+Installed.
+
+Next:
+  1. Edit ~/BrainPass/config/.env — set your API key and LLM_PROVIDER
+  2. Edit ~/BrainPass/config/identity/SOUL.md — your agent's personality
+  3. Start it:
+       systemctl --user start brainpass-librarian
+       systemctl --user enable brainpass-librarian
+  4. Verify:
+       curl http://127.0.0.1:7778/status
+
+Obsidian: Open folder as vault → ~/BrainPass/vault/
+EOF

@@ -1,292 +1,153 @@
-# BrainPass: Use Cases & Applications
+# BrainPass — Use Cases
 
-## What Is BrainPass?
-
-BrainPass gives **any AI agent persistent memory**. Your agent remembers conversations, cites sources, and maintains continuity across sessions — using Obsidian, NotebookLM, and your choice of LLM.
+BrainPass gives any AI agent a persistent memory. Here's who actually benefits,
+with real vault layouts you can copy.
 
 ---
 
-## Core Use Cases
+## 1. Developer with too many side projects
 
-### 1. Personal AI Assistant with Memory
+**Problem:** You've got five repos, three stacks, two deployment targets, and
+every new chat starts with "let me explain my setup again."
 
-**Problem:** ChatGPT, Claude, Gemini forget everything when the tab closes.
-
-**BrainPass Solution:**
-- Your agent remembers your preferences, history, and context
-- Cites exactly which conversation something was mentioned in
-- Maintains personality and relationship continuity
-
-**Example:**
-```
-You: "Remind me what my sister's birthday gift idea was"
-Agent: "According to your notes from March 10th [1], you planned to get 
-sheila@email.com a custom photo book of her dogs."
-```
-
-### 2. Knowledge Management for Professionals
-
-**Who:** Developers, writers, researchers, consultants
-
-**Use:**
-- Code snippets and solutions
-- Client meeting notes with citations
-- Project research with source tracking
-- Decision logs with reasoning preserved
-
-**Vault Structure:**
+**Vault layout:**
 ```
 vault/
-├── clients/
-│   ├── acme-corp.md
-│   └── globex-industries.md
 ├── projects/
-│   ├── migration-2026.md
-│   └── new-feature-x.md
-├── research/
-│   ├── rust-vs-go.md
-│   └── payment-processors.md
-└── decisions/
-    ├── why-postgres-over-mysql.md
-    └── architecture-v2.md
+│   ├── ripfire-cli.md          ← rust CLI, arch notes, open bugs
+│   ├── brainpass.md            ← this repo, TODO list
+│   └── auth-service.md         ← work project, the annoying one
+├── decisions/
+│   ├── why-postgres-over-mongo.md
+│   └── why-we-ditched-langchain.md
+└── snippets/
+    ├── fish-functions.md
+    └── docker-incantations.md
 ```
 
-### 3. Creative Writing & Worldbuilding
-
-**Who:** Authors, game designers, RPG masters
-
-**Use:**
-- Character profiles that evolve
-- Lore that stays consistent
-- Plot threads tracked across sessions
-- Dialogue style preserved
-
-**Example:**
-```
-User: "What was my protagonist's motivation again?"
-Agent: "From your character sheet [1], Maya Chen is driven by 
-her father's unsolved murder. Last session you added she 
-discovered the detective was involved."
-```
-
-### 4. Second Brain / Zettelkasten
-
-**Who:** Knowledge workers, students, lifelong learners
-
-**Use:**
-- Reading notes with citations
-- Idea connections (zettelkasten style)
-- Concept mapping
-- Retrievable learning
-
-**Workflow:**
-1. Read article → Add to `sources/`
-2. Agent extracts key points with citation
-3. Link to related concepts
-4. Later: "What did I read about neural networks?"
-
-### 5. Business Intelligence
-
-**Who:** Founders, product managers, analysts
-
-**Use:**
-- Competitive intelligence
-- Market research archives
-- User interview synthesis
-- Metric explanations
-
-**Example:**
-```
-User: "Why did we choose Stripe over Square?"
-Agent: "According to your decision log from January [1], 
-Stripe was chosen for better international support 
-and API documentation. Square was 30% cheaper but 
-lacked multi-currency features you needed."
-```
-
-### 6. Healthcare & Personal Tracking
-
-**Who:** Patients, caregivers, biohackers
-
-**Use:**
-- Symptom logs with patterns
-- Medication tracking
-- Doctor visit summaries
-- Experiment results
-
-**Privacy Note:** Local-first means your health data never leaves your machine.
-
-### 7. Education & Tutoring
-
-**Who:** Students, tutors, self-learners
-
-**Use:**
-- Study notes organized by subject
-- Practice problem tracking
-- Concept mastery tracking
-- Revision schedules
-
-### 8. Software Development
-
-**Who:** Developers, DevOps, SREs
-
-**Use:**
-- Bug tracking with context
-- Incident post-mortems
-- Architecture decision records (ADRs)
-- Snippet libraries
-
-**Integration:**
-- Link to GitHub issues
-- Reference PR numbers
-- Track deployment decisions
+**Payoff:** Your AI stops asking what stack you're on. It remembers that you
+chose Postgres over Mongo and why, so it doesn't suggest switching three
+months later.
 
 ---
 
-## Advanced Applications
+## 2. Writer / worldbuilder
 
-### Multi-Agent Teams
+**Problem:** 80k-word novel, 30 characters, ten intersecting plot threads, and
+your AI keeps contradicting itself about who knows what.
 
-Multiple agents sharing one vault:
-- **Research Agent** → Finds information
-- **Writing Agent** → Drafts documents  
-- **Review Agent** → Checks for consistency
-- All cite the same sources
-
-### Family Knowledge Base
-
-Shared vault for household:
-- Maintenance logs
-- Recipe collection with modifications
-- Kid milestones and stories
-- Important document references
-
-### Compliance & Auditing
-
-Industries requiring documentation:
-- Financial decision logs
-- Legal research trails
-- Regulatory compliance notes
-- Immutable local audit trail
-
----
-
-## Integration Examples
-
-### With Claude Code
-
-Add to `.claude/CLAUDE.md`:
-```markdown
-## Memory System
-
-Before responding, query local memory:
-```bash
-RECALL=$(curl -s -X POST http://127.0.0.1:7778/recall \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"{{USER_MESSAGE}}","topic":"none"}')
+**Vault layout:**
 ```
+vault/
+├── characters/
+│   ├── maya-chen.md            ← backstory, arc, current state
+│   ├── the-detective.md
+│   └── maya's-father.md
+├── lore/
+│   ├── the-city.md
+│   └── the-cult.md
+└── chapters/
+    ├── ch01.md
+    └── ch02.md
 ```
 
-### With Custom GPTs
+**Payoff:** When you ask "what did Maya know about the detective in chapter 7?"
+your AI answers from your actual character sheet instead of hallucinating a new
+version of the timeline.
 
-Use OpenAI's function calling:
-```python
-def query_memory(query: str):
-    """Query BrainPass for relevant context"""
-    return requests.post(
-        "http://127.0.0.1:7778/recall",
-        json={"message": query, "topic": query}
-    ).json()
+---
+
+## 3. Second brain / knowledge worker
+
+**Problem:** You read 20 articles a week and forget most of them by Monday.
+
+**Vault layout:**
+```
+vault/
+├── sources/
+│   ├── 2026-04-14-nn-scaling-laws.md
+│   └── 2026-04-12-transformer-inference.md
+├── topics/
+│   ├── neural-networks.md
+│   └── inference-optimization.md
+└── daily/
+    └── 2026-04-15.md           ← today's thoughts, linked to sources
 ```
 
-### With Obsidian Plugins
-
-Community plugins can:
-- Auto-sync vault changes
-- Trigger recalls on note open
-- Visualize knowledge graph
+**Payoff:** Six months from now, "what did I read about inference
+optimization?" returns actual citations with file paths, not vibes.
 
 ---
 
-## Success Patterns
+## 4. Founder / product manager
 
-### Do:
-- ✅ Write daily logs with dates
-- ✅ Use consistent file naming
-- ✅ Link related notes with `[[wikilinks]]`
-- ✅ Tag important concepts
-- ✅ Review and curate weekly
+**Problem:** Pitching investors, negotiating with vendors, making architecture
+calls — and nobody can remember which decision was made for which reason.
 
-### Don't:
-- ❌ Dump raw data without context
-- ❌ Use vague filenames
-- ❌ Forget to cite sources
-- ❌ Let vault become unorganized
-- ❌ Skip the recall step
+**Vault layout:**
+```
+vault/
+├── pitches/
+│   ├── seed-deck-v3.md
+│   └── investor-faq.md
+├── decisions/
+│   ├── stripe-over-square.md   ← the why, the tradeoff, the date
+│   └── aws-over-gcp.md
+├── metrics/
+│   └── 2026-04-mrr.md
+└── meetings/
+    └── 2026-04-10-sequoia.md
+```
 
----
-
-## Real-World Examples
-
-### Example 1: Developer Portfolio
-
-**User:** Job hunting, needs to remember all projects
-
-**Setup:**
-- `projects/` folder with one file per project
-- Tech stack tags
-- Challenge → Solution format
-- Links to GitHub repos
-
-**Result:** Can instantly recall "What did I build with React in 2025?"
-
-### Example 2: Therapy Journey
-
-**User:** Tracking mental health progress
-
-**Setup:**
-- `daily/` with mood + events
-- `insights/` for breakthroughs
-- `techniques/` that worked
-
-**Result:** Patterns emerge, agent provides context-aware support
-
-### Example 3: Startup Founder
-
-**User:** Pitching investors, needs consistent story
-
-**Setup:**
-- `pitches/` with versions
-- `metrics/` updated weekly
-- `feedback/` from each meeting
-
-**Result:** Never contradicts previous statements, cites traction numbers
+**Payoff:** Investor asks "why Stripe?" and your AI answers in your voice
+using the exact tradeoffs you wrote down three months ago. You never
+contradict yourself across pitches.
 
 ---
 
-## Getting Started
+## Quick wins for any vault
 
-1. **Install** BrainPass (see INSTALL.md)
-2. **Create** your first daily note
-3. **Query** your agent with context
-4. **Iterate** — add structure as needed
+- **Write daily logs.** `daily/YYYY-MM-DD.md`. Even two sentences. Future
+  you will thank you.
+- **Use consistent file names.** Searching "sarah" should always find
+  `people/sarah.md`.
+- **Link aggressively.** `[[ripfire-cli]]` in a daily note. Obsidian builds
+  the graph; your AI gets more signal.
+- **Never delete. Archive.** Move stale notes to `_archive/` so the librarian
+  can still surface them if needed.
 
-**Remember:** Your vault grows with you. Start simple.
+## What NOT to put in your vault
+
+- Raw API keys, passwords, 2FA secrets — it's a text file, not a password
+  manager.
+- Health or financial data you wouldn't be comfortable with your LLM provider
+  seeing. The librarian sends relevant snippets to your chosen LLM on every
+  recall.
+- Anything under an NDA that forbids cloud LLM access. Run a local model for
+  those vaults.
+
+## Integration with tools
+
+### Claude Code
+
+Put the magic instruction in your repo's `CLAUDE.md` or `~/.claude/CLAUDE.md`.
+See `docs/AGENT_INTEGRATION.md`.
+
+### ChatGPT
+
+Settings → Custom Instructions → "How would you like ChatGPT to respond?" —
+paste the magic instruction. ChatGPT can't hit `localhost` from their servers,
+so this works best with a local ChatGPT-compatible client (Open WebUI,
+LibreChat, etc.) that does.
+
+### LangChain / AutoGen / CrewAI
+
+Register `http://127.0.0.1:7778/recall` as a tool your agent can call. The
+agent framework handles the HTTP call; you just tell your agent to use the
+tool before answering anything personal.
 
 ---
 
-## Community Ideas
-
-Users have extended BrainPass for:
-- Habit tracking with streaks
-- Book/movie review databases
-- Investment journaling
-- Travel planning with research
-- Language learning progress
-- Recipe modification tracking
-
-**What's your use case?**
-
----
-
-*Built with love. Share your story.*
+BrainPass is only as smart as the notes you feed it. Start with five files.
+Add one a day. In three months your AI will know you better than half your
+coworkers.

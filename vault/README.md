@@ -2,11 +2,11 @@
 
 ## Folders
 
-- **daily/** — Session logs, daily entries
-- **topics/** — Curated knowledge, concepts
-- **people/** — Important people in your life
-- **projects/** — Active work and goals
-- **sources/** — External sources (articles, videos, PDFs)
+- **daily/** — session logs, daily entries
+- **topics/** — curated knowledge, concepts
+- **people/** — important people in your life
+- **projects/** — active work and goals
+- **sources/** — external sources (articles, videos, PDFs)
 
 ## File Format
 
@@ -25,11 +25,13 @@ Content here...
 
 ## Links
 
-- [[Related Topic]]
-- [[Person Name]]
+- [[related-topic]]
+- [[person-name]]
 ```
 
 ## Linking
 
-Use Obsidian wikilinks `[[File Name]]` to connect notes.
-The Librarian follows these links when searching.
+Use Obsidian wikilinks `[[File Name]]` to connect notes. Obsidian will render
+the graph view and backlinks. The Librarian itself uses **keyword search** over
+file contents — it doesn't follow wikilinks, but well-linked notes tend to
+contain the right keywords anyway, so they get found.
