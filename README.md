@@ -1,27 +1,53 @@
-# BrainPass 🧠⚡
+<div align="center">
 
-**Your AI finally remembers shit.**
+<img src="https://img.shields.io/badge/version-1.0.0-8B5CF6?style=flat-square" alt="version">
+<img src="https://img.shields.io/badge/license-MIT-6366F1?style=flat-square" alt="license">
+<img src="https://img.shields.io/badge/python-3.10+-3B82F6?style=flat-square" alt="python">
 
-*The open-source memory layer that turns any LLM into something with actual continuity.*
+</div>
+
+<h1 align="center">
+  <span style="color: #8B5CF6;">Brain</span><span style="color: #6366F1;">Pass</span> 🧠⚡
+</h1>
+
+<p align="center">
+  <strong style="color: #A78BFA;">Your AI finally remembers shit.</strong>
+</p>
+
+<p align="center">
+  <em style="color: #818CF8;">The open-source memory layer that turns any LLM into something with actual continuity.</em>
+</p>
 
 ---
 
-## TL;DR — What's This?
+---
 
-Every AI chat starts from zero. You explain your project. You explain it again. You explain it a third time. BrainPass fixes that.
+## <span style="color: #8B5CF6;">⚡ TL;DR — What's This?</span>
 
-**BrainPass = Obsidian (your notes) + NotebookLM (smart search) + Any LLM (Claude, GPT, Kimi, local)**
+<div align="center">
+
+| 🧠 **Obsidian** | 🔍 **NotebookLM** | 🤖 **Any LLM** |
+|:---:|:---:|:---:|
+| Your notes | Smart search | The brain |
+
+</div>
+
+Every AI chat starts from zero. You explain your project. You explain it again. You explain it a third time. **BrainPass fixes that.**
 
 Your AI can now:
-- Remember stuff across every conversation
-- Cite sources (no more hallucinations)
-- Actually learn who you are
+- ✅ Remember stuff across every conversation  
+- ✅ Cite sources (no more hallucinations)  
+- ✅ Actually learn who you are  
 
-Takes 10 minutes to set up. Costs $0 with free tiers. Your data stays on your machine.
+<div align="center">
+
+**⏱️ 10 min setup** · **💰 $0 with free tiers** · **🔒 Your data stays local**
+
+</div>
 
 ---
 
-## The Problem (In 30 Seconds)
+## <span style="color: #6366F1;">😤 The Problem (In 30 Seconds)</span>
 
 You know when you're deep in a project with Claude or ChatGPT, you've explained your entire architecture, your constraints, your preferences... and then you open a new chat and **poof** — it's all gone?
 
@@ -31,7 +57,7 @@ Current AI has **no memory**. BrainPass gives it one. A real one. Stored in mark
 
 ---
 
-## How It Works (The Cool Part)
+## <span style="color: #3B82F6;">🔮 How It Works (The Cool Part)</span>
 
 Instead of training or fine-tuning (expensive, slow, overkill), BrainPass uses **Retrieval-Augmented Generation** (RAG) — but make it simple.
 
@@ -55,7 +81,7 @@ Your AI answers using YOUR notes, citing the source files
 
 ---
 
-## The Stack (Keep It Boring)
+## <span style="color: #8B5CF6;">🛠️ The Stack (Keep It Boring)</span>
 
 We intentionally used boring, stable, already-exists tech:
 
@@ -70,16 +96,16 @@ No vector databases to configure. No Docker rituals. No $20/month SaaS middleman
 
 ---
 
-## Installation — 10 Minutes, Zero Decisions
+## <span style="color: #6366F1;">🚀 Installation — 10 Minutes, Zero Decisions</span>
 
-### Step 1: Get the Code
+### <span style="color: #3B82F6;">Step 1: Get the Code</span>
 
 ```bash
 git clone https://github.com/coderook520/BrainPass.git
 cd BrainPass
 ```
 
-### Step 2: Run the Setup Script
+### <span style="color: #8B5CF6;">Step 2: Run the Setup Script</span>
 
 ```bash
 ./install.sh
@@ -90,7 +116,7 @@ This creates `~/BrainPass/` with:
 - `config/.env` — API keys (template)
 - `config/identity/SOUL.md` — your agent's personality
 
-### Step 3: Add Your API Key
+### <span style="color: #6366F1;">Step 3: Add Your API Key</span>
 
 Edit `~/BrainPass/config/.env`:
 
@@ -105,7 +131,7 @@ LLM_MODEL=llama-3.3-70b-versatile
 - **Groq** — `console.groq.com` (fast, generous free tier)
 - **OpenRouter** — `openrouter.ai` (pay-per-use, cheap)
 
-### Step 4: Set Up Your Agent's Personality
+### <span style="color: #3B82F6;">Step 4: Set Up Your Agent's Personality</span>
 
 Edit `~/BrainPass/config/identity/SOUL.md`:
 
@@ -124,7 +150,7 @@ before answering questions about me or my projects. Cite sources.
 
 This file tells your AI how to behave. It's the "system prompt" that persists forever.
 
-### Step 5: Start the Librarian
+### <span style="color: #8B5CF6;">Step 5: Start the Librarian</span>
 
 ```bash
 systemctl --user start brainpass-librarian
@@ -137,7 +163,7 @@ curl http://127.0.0.1:7778/status
 # Should show: {"status": "ok", "vault_files": 0}
 ```
 
-### Step 6: Open Your Vault in Obsidian
+### <span style="color: #6366F1;">Step 6: Open Your Vault in Obsidian</span>
 
 1. Launch Obsidian
 2. "Open folder as vault" → select `~/BrainPass/vault/`
@@ -147,7 +173,7 @@ Done. Your AI now has memory.
 
 ---
 
-## Tell Your AI About BrainPass (CRITICAL STEP)
+## <span style="color: #EF4444;">⚠️ Tell Your AI About BrainPass (CRITICAL STEP)</span>
 
 **This is the #1 reason BrainPass "doesn't work" for people.** You have to actually tell your AI the librarian exists.
 
@@ -172,7 +198,7 @@ When I tell you something worth remembering, suggest which file to save
 it to (daily/, projects/, people/, topics/).
 ```
 
-### Where to Put This:
+### <span style="color: #3B82F6;">Where to Put This:</span>
 
 **Claude Code / Claude Desktop:**
 - Claude Code: Put it in your repo's `CLAUDE.md` or `.claude/CLAUDE.md`
@@ -190,7 +216,7 @@ it to (daily/, projects/, people/, topics/).
 
 ---
 
-## Writing Notes That Actually Help
+## <span style="color: #8B5CF6;">📝 Writing Notes That Actually Help</span>
 
 BrainPass is only as good as what you put in it. Quick tips:
 
@@ -214,7 +240,7 @@ BrainPass is only as good as what you put in it. Quick tips:
 
 ---
 
-## What Your AI Sees
+## <span style="color: #6366F1;">👁️ What Your AI Sees</span>
 
 When BrainPass finds relevant notes, your AI gets something like this:
 
@@ -241,7 +267,7 @@ That's the magic. Real context. Real answers.
 
 ---
 
-## Real Use Cases (Why Devs Actually Want This)
+## <span style="color: #3B82F6;">💡 Real Use Cases (Why Devs Actually Want This)</span>
 
 **Building a product:**
 - Store architecture decisions in `decisions/`
@@ -267,7 +293,7 @@ That's the magic. Real context. Real answers.
 
 ---
 
-## Troubleshooting (Because Something Always Breaks)
+## <span style="color: #EF4444;">🔧 Troubleshooting (Because Something Always Breaks)</span>
 
 **"Librarian won't start"**
 ```bash
@@ -291,7 +317,15 @@ journalctl --user -u brainpass-librarian -n 50
 
 ---
 
-## Security (Your Data Is Yours)
+## <span style="color: #10B981;">🔒 Security (Your Data Is Yours)</span>
+
+<div align="center">
+
+| ✅ No credentials in repo | ✅ Local markdown files | ✅ Localhost only |
+|:---:|:---:|:---:|
+| `.env` gitignored | Never leaves your machine | `127.0.0.1:7778` |
+
+</div>
 
 - ✅ No credentials in this repo — `.credentials` and `.env` are gitignored
 - ✅ Your vault is local markdown — doesn't leave your machine
@@ -301,7 +335,7 @@ journalctl --user -u brainpass-librarian -n 50
 
 ---
 
-## Architecture (For the Curious)
+## <span style="color: #8B5CF6;">🏗️ Architecture (For the Curious)</span>
 
 ```
 ┌─────────────────────────────────────────┐
@@ -334,7 +368,7 @@ The whole thing is ~300 lines of Python. No magic. Just good plumbing.
 
 ---
 
-## Contributing
+## <span style="color: #6366F1;">🤝 Contributing</span>
 
 This is the sanitized, open-source version of a memory system that's been running in production for months.
 
@@ -344,7 +378,7 @@ MIT License. Build your own brain.
 
 ---
 
-## Links
+## <span style="color: #3B82F6;">🔗 Links</span>
 
 - **Repo:** https://github.com/coderook520/BrainPass
 - **Issues:** https://github.com/coderook520/BrainPass/issues
