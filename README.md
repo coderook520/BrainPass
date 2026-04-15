@@ -93,23 +93,38 @@ You write notes in Obsidian (or literally any text editor — it's just markdown
 you → "what am I supposed to finish by Friday?"
        │
        ▼
-your AI → POST localhost:7778/recall
-              │
-              ▼
+(UserPromptSubmit hook fires automatically — before your AI sees the message)
+       │
+       ▼
+brainpass-inject.sh → POST localhost:7778/recall
+                            │
+                            ▼
        BrainPass searches ~/BrainPass/vault/ in ~50ms
-              │
-              ▼
+                            │
+                            ▼
        finds: projects/johnson.md, daily/2026-04-12.md
-              │
-              ▼
-       feeds them to your LLM with your question
+                            │
+                            ▼
+       feeds them to the librarian's runner LLM with your question
+                            │
+                            ▼
+       compiles a cited briefing and injects it into the conversation
+                            │
+                            ▼
+your AI ← sees your message + BrainPass briefing, reads both, answers
               │
               ▼
 you ← "wireframes — mobile breakpoint still open. Sarah needs
        them Friday EOD per projects/johnson.md."
 ```
 
-That's it. No vector DB. No LangChain. No $20/month SaaS middleman. Just a librarian and a stack of notes.
+That's it. No vector DB. No LangChain. No $20/month SaaS middleman. Just a librarian, a stack of notes, and a ~100-line shell hook that fires on every message so your AI never has to remember to check.
+
+### what makes it automatic
+
+The piece that turns BrainPass from *"AI has to remember to call /recall"* into *"AI just always knows"* is a `UserPromptSubmit` hook at `~/BrainPass/hooks/brainpass-inject.sh`. You register it once with your AI tool (Claude Code's `settings.json`, Warp's pre-prompt script, etc.) and from then on every single message you send fires it first — it grabs your prompt, hits the librarian, gets the compiled notes back, and drops them into the conversation *before* your AI sees your message. Your AI doesn't have to know BrainPass exists. It just reads a conversation that already has the right context in it.
+
+If your tool doesn't support pre-hooks (most web UIs), there's a fallback: paste a "always check BrainPass first" instruction into your system prompt. Works, but you're trusting the model to actually do it. The hook is the real wire.
 
 ---
 

@@ -50,6 +50,14 @@ if [ -d "$REPO_ROOT/docs" ]; then
     cp -r "$REPO_ROOT/docs" "$INSTALL_DIR/docs"
 fi
 
+# ─── Copy hooks (auto-inject hook for the user's AI tool) ────────────
+if [ -d "$REPO_ROOT/hooks" ]; then
+    echo "[..] copying hooks/"
+    rm -rf "$INSTALL_DIR/hooks"
+    cp -r "$REPO_ROOT/hooks" "$INSTALL_DIR/hooks"
+    chmod +x "$INSTALL_DIR/hooks/"*.sh 2>/dev/null || true
+fi
+
 # ─── Copy config (preserve user edits) ───────────────────────────────
 if [ ! -d "$INSTALL_DIR/config" ]; then
     echo "[..] copying config/ (first install)"
@@ -132,6 +140,14 @@ Next:
        systemctl --user enable brainpass-librarian
   4. Verify:
        curl http://127.0.0.1:7778/status
+  5. Wire the auto-inject hook into your AI tool:
+       ~/BrainPass/hooks/brainpass-inject.sh
+     (See SETUP-WITH-YOUR-AI.md Step 11.5 — this is the piece that
+      makes BrainPass fire on every message automatically instead of
+      only when your AI remembers to call it.)
+  6. Optional: upload ~/BrainPass/vault/ to https://notebooklm.google.com
+     as a new notebook for deeper semantic search, then set
+     NOTEBOOKLM_URL in ~/BrainPass/config/.env to the notebook URL.
 
 Obsidian: Open folder as vault → ~/BrainPass/vault/
 EOF

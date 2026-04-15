@@ -73,6 +73,11 @@ else:
 VAULT_PATH = Path(os.environ.get("VAULT_PATH", "~/BrainPass/vault")).expanduser()
 CACHE_FILE = Path(os.environ.get("CACHE_PATH", "/tmp/brainpass-topic.txt"))
 
+# Optional: NotebookLM notebook URL for deeper semantic search.
+# Surfaced in /status and /recall responses so the user's AI can suggest
+# NotebookLM as a fallback when keyword search comes up empty.
+NOTEBOOKLM_URL = os.environ.get("NOTEBOOKLM_URL", "").strip()
+
 # Identity files — resolve from config relative to this script's parent.
 # Respect ~/BrainPass/config/identity/ first (installed location), fall back
 # to the repo-relative config/ so dev runs still work.
@@ -263,7 +268,12 @@ def recall(raw_message, topic_hint=""):
     search_results = search_files(topic, max_results=5)
 
     if not search_results:
-        return {"result": "", "topic": topic, "files_searched": 0}
+        return {
+            "result": "",
+            "topic": topic,
+            "files_searched": 0,
+            "notebooklm_url": NOTEBOOKLM_URL or None,
+        }
 
     context = ""
     for i, result in enumerate(search_results, 1):
@@ -295,6 +305,7 @@ def recall(raw_message, topic_hint=""):
         "topic": topic,
         "files_searched": len(search_results),
         "sources": [r["file"] for r in search_results],
+        "notebooklm_url": NOTEBOOKLM_URL or None,
     }
 
 
@@ -318,6 +329,8 @@ class LibrarianHandler(BaseHTTPRequestHandler):
                 "llm_model": LLM_MODEL,
                 "keys_configured": len(API_KEYS),
                 "files_indexed": count_brain_files(),
+                "notebooklm_url": NOTEBOOKLM_URL or None,
+                "auto_inject_hook": "hooks/brainpass-inject.sh",
             })
         elif path == "/query":
             query = parsed.get("q", [""])[0]
