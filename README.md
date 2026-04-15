@@ -7,22 +7,20 @@
 </div>
 
 <h1 align="center">
-  <span style="color: #8B5CF6;">Brain</span><span style="color: #6366F1;">Pass</span> 🧠⚡
+  <img src="https://img.shields.io/badge/Brain-8B5CF6?style=for-the-badge" alt="Brain"><img src="https://img.shields.io/badge/Pass-6366F1?style=for-the-badge" alt="Pass"> 🧠⚡
 </h1>
 
 <p align="center">
-  <strong style="color: #A78BFA;">Your AI finally remembers shit.</strong>
+  <strong>Your AI finally remembers shit.</strong>
 </p>
 
 <p align="center">
-  <em style="color: #818CF8;">The open-source memory layer that turns any LLM into something with actual continuity.</em>
+  <em>The open-source memory layer that turns any LLM into something with actual continuity.</em>
 </p>
 
 ---
 
----
-
-## <span style="color: #8B5CF6;">⚡ TL;DR — What's This?</span>
+## ⚡ TL;DR — What's This?
 
 <div align="center">
 
@@ -47,7 +45,7 @@ Your AI can now:
 
 ---
 
-## <span style="color: #6366F1;">😤 The Problem (In 30 Seconds)</span>
+## 😤 The Problem (In 30 Seconds)
 
 You know when you're deep in a project with Claude or ChatGPT, you've explained your entire architecture, your constraints, your preferences... and then you open a new chat and **poof** — it's all gone?
 
@@ -57,7 +55,7 @@ Current AI has **no memory**. BrainPass gives it one. A real one. Stored in mark
 
 ---
 
-## <span style="color: #3B82F6;">🔮 How It Works (The Cool Part)</span>
+## 🔮 How It Works (The Cool Part)
 
 Instead of training or fine-tuning (expensive, slow, overkill), BrainPass uses **Retrieval-Augmented Generation** (RAG) — but make it simple.
 
@@ -81,7 +79,7 @@ Your AI answers using YOUR notes, citing the source files
 
 ---
 
-## <span style="color: #8B5CF6;">🛠️ The Stack (Keep It Boring)</span>
+## 🛠️ The Stack (Keep It Boring)
 
 We intentionally used boring, stable, already-exists tech:
 
@@ -96,16 +94,16 @@ No vector databases to configure. No Docker rituals. No $20/month SaaS middleman
 
 ---
 
-## <span style="color: #6366F1;">🚀 Installation — 10 Minutes, Zero Decisions</span>
+## 🚀 Installation — 10 Minutes, Zero Decisions
 
-### <span style="color: #3B82F6;">Step 1: Get the Code</span>
+### 📥 Step 1: Get the Code
 
 ```bash
 git clone https://github.com/coderook520/BrainPass.git
 cd BrainPass
 ```
 
-### <span style="color: #8B5CF6;">Step 2: Run the Setup Script</span>
+### ⚙️ Step 2: Run the Setup Script
 
 ```bash
 ./install.sh
@@ -116,7 +114,7 @@ This creates `~/BrainPass/` with:
 - `config/.env` — API keys (template)
 - `config/identity/SOUL.md` — your agent's personality
 
-### <span style="color: #6366F1;">Step 3: Add Your API Key</span>
+### 🔑 Step 3: Add Your API Key
 
 Edit `~/BrainPass/config/.env`:
 
@@ -131,7 +129,7 @@ LLM_MODEL=llama-3.3-70b-versatile
 - **Groq** — `console.groq.com` (fast, generous free tier)
 - **OpenRouter** — `openrouter.ai` (pay-per-use, cheap)
 
-### <span style="color: #3B82F6;">Step 4: Set Up Your Agent's Personality</span>
+### 🎭 Step 4: Set Up Your Agent's Personality
 
 Edit `~/BrainPass/config/identity/SOUL.md`:
 
@@ -150,7 +148,7 @@ before answering questions about me or my projects. Cite sources.
 
 This file tells your AI how to behave. It's the "system prompt" that persists forever.
 
-### <span style="color: #8B5CF6;">Step 5: Start the Librarian</span>
+### 🚀 Step 5: Start the Librarian
 
 ```bash
 systemctl --user start brainpass-librarian
@@ -163,7 +161,7 @@ curl http://127.0.0.1:7778/status
 # Should show: {"status": "ok", "vault_files": 0}
 ```
 
-### <span style="color: #6366F1;">Step 6: Open Your Vault in Obsidian</span>
+### 📝 Step 6: Open Your Vault in Obsidian
 
 1. Launch Obsidian
 2. "Open folder as vault" → select `~/BrainPass/vault/`
@@ -173,7 +171,7 @@ Done. Your AI now has memory.
 
 ---
 
-## <span style="color: #EF4444;">⚠️ Tell Your AI About BrainPass (CRITICAL STEP)</span>
+## ⚠️ Tell Your AI About BrainPass (CRITICAL STEP)
 
 **This is the #1 reason BrainPass "doesn't work" for people.** You have to actually tell your AI the librarian exists.
 
@@ -198,7 +196,7 @@ When I tell you something worth remembering, suggest which file to save
 it to (daily/, projects/, people/, topics/).
 ```
 
-### <span style="color: #3B82F6;">Where to Put This:</span>
+### 🎯 Where to Put This:
 
 **Claude Code / Claude Desktop:**
 - Claude Code: Put it in your repo's `CLAUDE.md` or `.claude/CLAUDE.md`
@@ -216,7 +214,7 @@ it to (daily/, projects/, people/, topics/).
 
 ---
 
-## <span style="color: #8B5CF6;">📝 Writing Notes That Actually Help</span>
+## 📝 Writing Notes That Actually Help
 
 BrainPass is only as good as what you put in it. Quick tips:
 
@@ -240,7 +238,7 @@ BrainPass is only as good as what you put in it. Quick tips:
 
 ---
 
-## <span style="color: #6366F1;">👁️ What Your AI Sees</span>
+## 👁️ What Your AI Sees
 
 When BrainPass finds relevant notes, your AI gets something like this:
 
@@ -267,7 +265,7 @@ That's the magic. Real context. Real answers.
 
 ---
 
-## <span style="color: #3B82F6;">💡 Real Use Cases (Why Devs Actually Want This)</span>
+## 💡 Real Use Cases (Why Devs Actually Want This)
 
 **Building a product:**
 - Store architecture decisions in `decisions/`
@@ -293,7 +291,7 @@ That's the magic. Real context. Real answers.
 
 ---
 
-## <span style="color: #EF4444;">🔧 Troubleshooting (Because Something Always Breaks)</span>
+## 🔧 Troubleshooting (Because Something Always Breaks)
 
 **"Librarian won't start"**
 ```bash
@@ -317,7 +315,7 @@ journalctl --user -u brainpass-librarian -n 50
 
 ---
 
-## <span style="color: #10B981;">🔒 Security (Your Data Is Yours)</span>
+## 🔒 Security (Your Data Is Yours)
 
 <div align="center">
 
@@ -335,7 +333,7 @@ journalctl --user -u brainpass-librarian -n 50
 
 ---
 
-## <span style="color: #8B5CF6;">🏗️ Architecture (For the Curious)</span>
+## 🏗️ Architecture (For the Curious)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -348,8 +346,8 @@ journalctl --user -u brainpass-librarian -n 50
 │      BrainPass Librarian                │
 │   (Python HTTP server on :7778)         │
 │   - Receives queries from LLM           │
-│   - Searches vault (keyword/FTS5)     │
-│   - Returns relevant note snippets      │
+│   - Searches vault (keyword/FTS5)       │
+│   - Returns relevant note snippets        │
 └──────────────┬──────────────────────────┘
                │
                ▼
@@ -368,7 +366,7 @@ The whole thing is ~300 lines of Python. No magic. Just good plumbing.
 
 ---
 
-## <span style="color: #6366F1;">🤝 Contributing</span>
+## 🤝 Contributing
 
 This is the sanitized, open-source version of a memory system that's been running in production for months.
 
@@ -378,7 +376,7 @@ MIT License. Build your own brain.
 
 ---
 
-## <span style="color: #3B82F6;">🔗 Links</span>
+## 🔗 Links
 
 - **Repo:** https://github.com/coderook520/BrainPass
 - **Issues:** https://github.com/coderook520/BrainPass/issues
@@ -388,6 +386,10 @@ MIT License. Build your own brain.
 
 ---
 
+<div align="center">
+
 *Made by developers who were tired of explaining the same shit to their AI every single day.*
 
-🧠⚡ **Give your AI a memory.**
+### 🧠⚡ Give your AI a memory.
+
+</div>
