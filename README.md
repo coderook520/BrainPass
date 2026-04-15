@@ -29,6 +29,18 @@ Your AI forgets you exist every time you close the tab. BrainPass gives it a not
 
 ---
 
+## easiest install — hand it to your AI
+
+You don't have to read this README. Clone the repo, open the folder in whatever AI coding tool you use — Claude Code, Cursor, Warp, Windsurf, Aider, Continue, whatever — and say:
+
+> **"Read `SETUP-WITH-YOUR-AI.md` and set this up for me."**
+
+Your AI will read the runbook, walk you through a 10-minute conversation, ask which LLM you want running behind the librarian (it'll recommend Groq's free tier), grab an API key from you, run the installer, start the service, wire itself into BrainPass, write your first note with you, and prove recall works. You answer like five questions total and hit enter.
+
+If you'd rather install it manually — or you don't have an AI tool to hand the repo to — the rest of this README is the human version.
+
+---
+
 ## how it actually works
 
 You write notes in Obsidian (or literally any text editor — it's just markdown). A tiny Python service sits on `localhost:7778` and waits. When your AI has a question about you, it hits that service. The service searches your notes, grabs what's relevant, stuffs it into your LLM with your question, and hands back the answer. With citations.
