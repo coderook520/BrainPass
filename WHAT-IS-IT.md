@@ -1,65 +1,51 @@
-# What BrainPass Actually Is
+# what BrainPass actually is
 
-## Part 1: The Technical Truth (No Bullshit)
+Short version: your AI is a goldfish. BrainPass is the assistant standing next to the goldfish, handing it a briefing packet 50 milliseconds before it opens its mouth.
 
-Your AI doesn't remember anything. That's not an exaggeration — every single chat starts with a blank slate. You could spend 3 hours explaining your entire business, close the tab, open a new one, and it's like you never met.
+## the goldfish thing
 
-**BrainPass fixes this by making your AI *forgetting* irrelevant.**
+Every LLM — Claude, GPT, Kimi, Llama, whoever — resets to zero the second you close the tab. No persistence. You could spend three hours explaining your business, walk away, come back, and it's a stranger.
 
-Instead of trying to make Claude "remember" (impossible with current tech), BrainPass feeds your AI the right information *in real-time* every time you ask a question. Here's exactly what happens:
+You can't fix that. No amount of prompting teaches a stateless model to "remember." The weights are frozen. The context window is finite and expensive. Anyone selling you "AI memory" is selling you a summary their backend compresses your life into.
 
-1. **You ask:** "What's the status on the Johnson project?"
-2. **BrainPass hears this** and searches your Obsidian vault (all your notes) in ~50 milliseconds
-3. **BrainPass finds:** `projects/johnson.md`, `daily/2026-04-14.md`, `people/sarah.md`
-4. **BrainPass injects those notes directly into Claude's context window** — alongside your question
-5. **Claude answers** using YOUR notes as the source of truth, not training data from 2022
+What you *can* fix is making the goldfish's forgetting **irrelevant**.
 
-**The distinction that matters:** Claude isn't "remembering" your project. He's being handed a briefing packet *before* every single response. Like a president with a staff who pre-reads every document and summarizes what matters.
+## Marcus and Sarah
 
-Your Obsidian vault is the filing cabinet. BrainPass is the staff who pulls files. Claude is the decision-maker who just reads faster than anyone else.
+Picture a boardroom. Marcus is brilliant. Solves anything you throw at him. But he has no memory — if you pause for breath, he forgets who you are, what company you run, what you were just saying.
 
----
+Without help, every conversation is:
 
-## Part 2: The Meeting Room (Why This Actually Works)
+> **you:** "About the Johnson wireframes..."
+> **Marcus:** "Who's Johnson? What project? Sorry, no context."
 
-Picture this: You're in a high-stakes boardroom meeting with **Marcus** — brilliant CEO, solves any problem you throw at him, but there's a problem. **Marcus has goldfish memory.** Every time you pause for breath, he forgets who you are, what company you're from, and what you were talking about.
+You paste the same brief. Re-introduce the same people. Re-explain the same decisions. Groundhog Day with a genius.
 
-**Without Sarah (no BrainPass):**
+Now put **Sarah** next to him. Three superpowers:
 
-**You:** "So about the Johnson wireframes..."
+1. Access to the filing cabinet in the corner of the room (your Obsidian vault)
+2. She can scan 10,000 documents in 50 milliseconds
+3. She doesn't wait to be asked
 
-**Marcus:** "Who's Johnson? What project? Are you a client? I'm sorry, I don't have any context here."
+You start talking. Sarah dashes to the cabinet, pulls the Johnson folder, grabs Tuesday's meeting notes, snags yesterday's Slack thread, slaps a briefing on Marcus's desk before he opens his mouth.
 
-Every. Single. Time. You explain your business from scratch. You paste the same project briefs. You re-introduce the same people. It's Groundhog Day with a genius who can't remember yesterday.
+> **Marcus** *(flipping the packet):* "Right — you're 80% done on the mobile breakpoint, Sarah Chen needs it Friday EOD, she prefers Slack, and she sounded stressed in your Tuesday call. Want me to unstick the nav component?"
 
-**Now, sitting beside Marcus is Sarah (BrainPass activated):**
+Marcus didn't remember anything. He's still a goldfish. But Sarah fed him every detail 0.05 seconds before he needed it, and from your side it feels like talking to someone who's been in every meeting.
 
-Sarah has three superpowers: Photographic memory. Access to a massive filing cabinet in the corner (your Obsidian vault). Speed — she can search 10,000 documents in 50 milliseconds.
+**That's BrainPass.**
 
-**You:** "So about the Johnson wireframes..."
+- **You** are the person in the room.
+- **Marcus** is whatever LLM you're pointed at (swap anytime).
+- **Sarah** is the librarian running on `127.0.0.1:7778`.
+- **The filing cabinet** is your Obsidian vault — markdown files on your disk.
 
-**Sarah** *doesn't hesitate. Dashes to the filing cabinet. Pulls the project folder. Grabs meeting minutes from Tuesday. Snags the Slack thread from yesterday. Stuffs everything into a briefing folder. Slaps it on Marcus's desk before he opens his mouth.*
+## why this beats "AI memory" features
 
-**Marcus (flipping through the briefing):** "Right, Johnson. You owe them mobile breakpoints by Friday — that's slipped twice already. Sarah Chen is your PM contact, she prefers Slack over email, and she sounded stressed about timeline in your Tuesday call. Your last note says you're 80% done but stuck on the nav component. Want me to help with that?"
+ChatGPT and friends sell "memory" that's a compressed summary sitting on their servers. It loses nuance. You can't audit it. You can't edit it. If they change the policy tomorrow it's gone.
 
-Marcus didn't "remember" a damn thing. **Sarah fed him every detail 0.05 seconds before he spoke.** He's still a goldfish. But now he's a goldfish with a world-class assistant who never sleeps, never forgets, and never judges you for asking the same question twice.
+BrainPass doesn't summarize. It *retrieves*. The full note. The exact thread. The complete spec. Fresh, every time.
 
-**The feeling:** You know how ChatGPT makes you feel like you're explaining yourself to a stranger? BrainPass makes you feel like you're talking to someone who's been in every meeting, read every doc, and actually *knows* your shit.
+You own the cabinet. You switch AIs whenever. You delete anything. You audit every byte your AI has access to. It's your disk.
 
----
-
-## Why This Is Different From "AI Memory"
-
-Companies sell "memory" features that are garbage. They store summaries. They compress your life into tokens. They lose nuance, context, the actual details.
-
-**BrainPass doesn't summarize. It retrieves.** The full note. The exact Slack thread. The complete project spec. Injected fresh every time.
-
-Your AI doesn't learn — it gets briefed. That's not a limitation. That's a feature.
-
-Because you control the filing cabinet. You can edit it. Delete it. Audit every single thing your AI "knows" about you. Try doing that with whatever ChatGPT remembers in its black box.
-
-**Switch AIs?** Keep your vault. **Claude goes down?** Talk to GPT-4. **Google kills NotebookLM?** Swap the search layer. 
-
-**You own the filing cabinet.** The AI just reads what's in it.
-
-And that's why BrainPass works.
+That's the whole thing. Everything else is plumbing.
