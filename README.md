@@ -1,299 +1,359 @@
-# BrainPass 🧠
+# BrainPass 🧠⚡
 
-**Give your AI a real memory. One it actually uses. One you can read.**
+**Your AI finally remembers shit.**
 
----
-
-## TL;DR
-
-AI models forget everything the moment you close the chat. BrainPass fixes that. It gives your AI a **notebook** (Obsidian), a **librarian** (NotebookLM or plain file search), and a **voice** (any LLM you want — Claude, GPT, Kimi, local models). You write notes once, the AI reads them forever, and every answer it gives you comes with a citation so you can check its work.
-
-Install it in about ten minutes. Works on Linux, Mac, and Windows (with WSL).
+*The open-source memory layer that turns any LLM into something with actual continuity.*
 
 ---
 
-## What Is This, Really?
+## TL;DR — What's This?
 
-Imagine you had a super-smart friend, but every time you talked to them they forgot who you were, what you were working on, and everything you'd ever told them. Annoying, right? That's how AI chatbots work by default. Every new conversation starts from zero.
+Every AI chat starts from zero. You explain your project. You explain it again. You explain it a third time. BrainPass fixes that.
 
-BrainPass is the fix. Think of it like this:
+**BrainPass = Obsidian (your notes) + NotebookLM (smart search) + Any LLM (Claude, GPT, Kimi, local)**
 
-- You have a **notebook** where you write down things you want the AI to remember. Your goals. Your projects. People in your life. Your preferences. Stuff that matters to you.
-- You have a **librarian** who reads that notebook and can find any note in a fraction of a second.
-- You have an **AI** that, instead of guessing or making stuff up, asks the librarian first — "hey, what do we know about this?" — and only then answers you.
+Your AI can now:
+- Remember stuff across every conversation
+- Cite sources (no more hallucinations)
+- Actually learn who you are
 
-Three parts. They're all standard tools. You probably already have most of them.
-
-| Part | What it is | What it does |
-|---|---|---|
-| **Obsidian** | A free notebook app | You write notes. They're just markdown files on your computer. |
-| **NotebookLM** | A free Google tool (optional) | Google reads your notes and lets you search them with natural language. |
-| **Librarian** | A tiny program BrainPass gives you | Sits in the background, answers questions from your AI by looking in your notebook. |
-| **Your LLM** | Whatever AI you want | Claude, GPT-4, Kimi, Llama — BrainPass doesn't care. |
-
-You put these four things together and suddenly your AI has **memory that survives across every chat, forever, that you fully control**.
+Takes 10 minutes to set up. Costs $0 with free tiers. Your data stays on your machine.
 
 ---
 
-## Why You'd Want This
+## The Problem (In 30 Seconds)
 
-- **The AI stops making stuff up.** Instead of guessing, it reads your notes first. Every answer cites a source file.
-- **You stop repeating yourself.** You wrote "I'm allergic to peanuts" once. Your AI remembers forever.
-- **Your data stays on your computer.** Not OpenAI's servers. Not Anthropic's. Yours. Markdown files in a folder you own.
-- **You can switch AIs without losing your memory.** Claude down today? Point BrainPass at GPT-4. Groq having a bad day? Swap to local Llama. Your notes don't care.
-- **It's auditable.** If your AI says something weird, you can open the exact note it read and see why. No black box.
+You know when you're deep in a project with Claude or ChatGPT, you've explained your entire architecture, your constraints, your preferences... and then you open a new chat and **poof** — it's all gone?
+
+That's not a feature. That's a bug.
+
+Current AI has **no memory**. BrainPass gives it one. A real one. Stored in markdown files you own, can edit, can audit, can take anywhere.
 
 ---
 
-## How It Works (The Flow)
+## How It Works (The Cool Part)
 
-Here's what happens when you ask your AI a question with BrainPass running:
+Instead of training or fine-tuning (expensive, slow, overkill), BrainPass uses **Retrieval-Augmented Generation** (RAG) — but make it simple.
 
 ```
-You ask: "What am I supposed to do for the Johnson project this week?"
-     │
-     ▼
-Your AI says: "Hold on, let me check the notebook."
-     │
-     ▼
-AI calls BrainPass's librarian at http://127.0.0.1:7778/recall
-     │
-     ▼
-Librarian searches your Obsidian vault for notes about "Johnson project"
-     │
-     ▼
-Librarian finds: projects/johnson.md, daily/2026-04-12.md
-     │
-     ▼
-Librarian sends those notes to your chosen LLM with your question
-     │
-     ▼
-LLM reads the notes and answers you, citing the files
-     │
-     ▼
-You get: "According to projects/johnson.md, you owe them the wireframes
-          by Friday, and from daily/2026-04-12.md, you agreed to meet
-          Sarah on Thursday at 2pm to go over them."
+You ask: "What was I supposed to finish by Friday?"
+         │
+         ▼
+Your AI hits: POST http://127.0.0.1:7778/recall
+         │
+         ▼
+BrainPass searches your Obsidian vault in ~50ms
+         │
+         ▼
+Returns relevant notes to your AI with full context
+         │
+         ▼
+Your AI answers using YOUR notes, citing the source files
 ```
 
-That's the whole magic. No vector database rituals, no fine-tuning, no rebuilding anything. Just notes + a search + an LLM.
+**Result:** No more "as an AI language model..." — you get "According to your notes from Tuesday..."
 
 ---
 
-## What You Need Before You Start
+## The Stack (Keep It Boring)
 
-1. **A computer.** Linux or Mac works out of the box. Windows works through WSL (Windows Subsystem for Linux).
-2. **Python 3.10 or newer.** If you don't have it: `sudo apt install python3` (Linux) or download from python.org (Mac/Windows).
-3. **Obsidian.** Free, download from [obsidian.md](https://obsidian.md).
-4. **An LLM API key.** Pick one:
-   - **Groq** (free tier, fast) — [console.groq.com](https://console.groq.com)
-   - **OpenAI** — [platform.openai.com](https://platform.openai.com)
-   - **Anthropic** — [console.anthropic.com](https://console.anthropic.com)
-   - **Local model** — no key needed, but you need Ollama or similar running.
-5. **A NotebookLM account.** (Optional but recommended.) Free. [notebooklm.google.com](https://notebooklm.google.com)
+We intentionally used boring, stable, already-exists tech:
 
-That's it. Total cost to get started: **$0** if you use Groq's free tier.
+| Component | What It Does | Why We Picked It |
+|-----------|--------------|------------------|
+| **Obsidian** | Markdown note-taking | Free, local-first, links between notes |
+| **NotebookLM** (optional) | Google's RAG over your files | Free tier, smart search, easy setup |
+| **Python 3.10+** | The librarian service | Everyone has it, runs anywhere |
+| **Your LLM** | The brain that talks to you | Claude, GPT, Kimi, Ollama — we don't care |
+
+No vector databases to configure. No Docker rituals. No $20/month SaaS middleman.
 
 ---
 
-## Installation
+## Installation — 10 Minutes, Zero Decisions
 
-### Step 1 — Clone the repo
+### Step 1: Get the Code
 
 ```bash
 git clone https://github.com/coderook520/BrainPass.git
 cd BrainPass
 ```
 
-### Step 2 — Run the installer
+### Step 2: Run the Setup Script
 
 ```bash
 ./install.sh
 ```
 
-The installer creates a folder at `~/BrainPass/` with your vault, copies a config template, and sets up a background service so the librarian starts automatically.
+This creates `~/BrainPass/` with:
+- `vault/` — your Obsidian notes folder
+- `config/.env` — API keys (template)
+- `config/identity/SOUL.md` — your agent's personality
 
-### Step 3 — Add your API key
+### Step 3: Add Your API Key
 
-Open `~/BrainPass/config/.env` in any text editor and fill in the one you're using:
+Edit `~/BrainPass/config/.env`:
 
 ```bash
-# Pick ONE of these. Leave the others blank.
+# Pick ONE provider (we recommend Groq for free tier)
 GROQ_API_KEY=gsk_your_key_here
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-
-# Which LLM to use (match the key above)
 LLM_PROVIDER=groq
-LLM_MODEL=openai/gpt-oss-120b
+LLM_MODEL=llama-3.3-70b-versatile
 ```
 
-### Step 4 — Tell the librarian who your agent is
+**Free tier options:**
+- **Groq** — `console.groq.com` (fast, generous free tier)
+- **OpenRouter** — `openrouter.ai` (pay-per-use, cheap)
 
-Open `~/BrainPass/config/identity/SOUL.md` and write a short description of how you want your AI to behave. Example:
+### Step 4: Set Up Your Agent's Personality
+
+Edit `~/BrainPass/config/identity/SOUL.md`:
 
 ```markdown
-# My Agent's Identity
+# My Agent
 
-You are my personal assistant. You help me with writing, research, and
-planning. You speak casually, like a friend. You always check my notes
-before answering. If you don't find an answer in the notes, say so
-clearly instead of guessing.
+You're my personal assistant. Speak casually. Always check my notes 
+before answering questions about me or my projects. Cite sources.
 
-## My Preferences
-- I prefer short answers unless I ask for detail.
-- I hate emojis in responses.
-- I'm working on a novel called "Glasswater".
-- Call me by my first name.
+## About Me
+- I'm building [your project]
+- I prefer short answers
+- My timezone is America/Chicago
+- Call me by my name
 ```
 
-This file is what makes your AI **yours**. It's the personality. Edit it any time.
+This file tells your AI how to behave. It's the "system prompt" that persists forever.
 
-### Step 5 — Open your vault in Obsidian
-
-- Launch Obsidian.
-- Click **Open another vault** → **Open folder as vault**.
-- Choose `~/BrainPass/vault/`.
-- You'll see five starter folders: `daily`, `topics`, `people`, `projects`, `sources`. Start writing notes in whichever ones make sense to you.
-
-### Step 6 — Start the librarian
+### Step 5: Start the Librarian
 
 ```bash
 systemctl --user start brainpass-librarian
 systemctl --user enable brainpass-librarian  # auto-start on boot
 ```
 
-Check it's alive:
-
+Verify it's running:
 ```bash
 curl http://127.0.0.1:7778/status
+# Should show: {"status": "ok", "vault_files": 0}
 ```
 
-You should see something like `{"status": "ok", "provider": "groq", "vault_files": 0}`. Done. The librarian is running.
+### Step 6: Open Your Vault in Obsidian
+
+1. Launch Obsidian
+2. "Open folder as vault" → select `~/BrainPass/vault/`
+3. Write your first note in `daily/YYYY-MM-DD.md`
+
+Done. Your AI now has memory.
 
 ---
 
-## Connecting Your AI to BrainPass
+## Tell Your AI About BrainPass (CRITICAL STEP)
 
-This is the part most people miss. Installing BrainPass isn't enough — **you have to tell your AI that BrainPass exists and how to use it.** The way you do that depends on which AI you're using, but the message you give it is the same.
+**This is the #1 reason BrainPass "doesn't work" for people.** You have to actually tell your AI the librarian exists.
 
-### The Magic Instruction (copy-paste this to your AI)
-
-Paste this into your AI's system prompt, custom instructions, or the first message of a new chat:
+Add this to your AI's system prompt or custom instructions:
 
 ```
-You have access to a persistent memory system called BrainPass running at
-http://127.0.0.1:7778. It stores notes about me, my projects, my preferences,
-and our past conversations in an Obsidian vault.
+You have access to a memory system called BrainPass running at 
+http://127.0.0.1:7778. It contains my notes, preferences, and project 
+information in markdown files.
 
-BEFORE answering any question about me, my work, or anything we've discussed
-previously, you MUST query BrainPass first:
+BEFORE answering any question about me, my work, my preferences, or 
+anything we've discussed previously, you MUST query BrainPass:
 
   POST http://127.0.0.1:7778/recall
-  Body: {"message": "<the user's question>", "topic": "<main topic>"}
+  Body: {"message": "<user's question>", "topic": "<main topic>"}
 
-The response will contain relevant notes from my vault. Read them, then
-answer my question using those notes as your source of truth. Always cite
-which file(s) you got the answer from.
+Read the returned notes and answer using them as your source of truth. 
+Always cite which file(s) you referenced. If BrainPass returns nothing 
+relevant, say "I checked your notes and didn't find anything about that."
 
-If BrainPass returns nothing relevant, say so out loud: "I checked the
-notebook and didn't find anything about that." Never make up answers.
-
-When I tell you something new worth remembering, tell me which file it
-should go in (daily/, topics/, projects/, or people/) so I can write it
-down.
+When I tell you something worth remembering, suggest which file to save 
+it to (daily/, projects/, people/, topics/).
 ```
 
-### Per-AI Setup
+### Where to Put This:
 
-**Claude (Claude Code, Claude.ai, Claude API):**
-Put the magic instruction in your project's `CLAUDE.md` file or in Claude's system prompt.
+**Claude Code / Claude Desktop:**
+- Claude Code: Put it in your repo's `CLAUDE.md` or `.claude/CLAUDE.md`
+- Claude Desktop: Settings → Project Instructions
 
-**ChatGPT (GPT-4, custom GPTs):**
-Put the magic instruction in "Custom Instructions" → "How would you like ChatGPT to respond?"
+**ChatGPT:**
+- Settings → Custom Instructions → "How would you like ChatGPT to respond?"
 
-**Open WebUI / Ollama / local models:**
-Put it in the system prompt field of your chat.
+**Open WebUI / Ollama:**
+- System Prompt field in chat settings
 
-**Any agent framework (LangChain, AutoGen, CrewAI):**
-Add `http://127.0.0.1:7778/recall` as a tool your agent can call. The magic instruction goes in the agent's system message.
+**Any agent framework (LangChain, AutoGen, etc.):**
+- Add `http://127.0.0.1:7778/recall` as a tool your agent can call
+- Include the magic instruction in the system message
 
 ---
 
-## Writing Good Notes
+## Writing Notes That Actually Help
 
-BrainPass is only as good as what you put in it. A few rules of thumb:
+BrainPass is only as good as what you put in it. Quick tips:
 
-1. **One idea per file.** Don't cram everything into one mega-note. Break it up.
-2. **Name files like a human would search.** `projects/johnson-wireframes.md` beats `proj_01.md`.
-3. **Date your daily notes.** `daily/2026-04-15.md`. Future you will thank you.
-4. **Link between notes.** Obsidian supports `[[other-note]]` syntax. Use it. The more your notes connect, the smarter your AI gets.
-5. **Write for your AI the way you'd brief a new assistant.** Short sentences. Clear facts. Dates when they matter.
+1. **Use daily notes:** `daily/2026-04-15.md` — dump thoughts, decisions, what you learned
+2. **Link between notes:** `[[johnson-project]]` — Obsidian makes this easy
+3. **One idea per file:** Don't write novels. Split into `johnson-timeline.md`, `johnson-contacts.md`, etc.
+4. **Write for search:** Name files what you'd actually search for
+5. **Include metadata:** Dates, who said what, decisions made
 
-Example of a good note (`people/sarah.md`):
-
+**Example good note** (`people/sarah.md`):
 ```markdown
 # Sarah Chen
 
-- Project manager on Johnson wireframes
-- Works Tue/Thu only
-- Prefers Slack over email
-- Birthday: March 3
-- Met her at DesignCamp 2025
-- Married to Dave (also a PM)
+- PM on Johnson wireframes project
+- Available Tue/Thu only
+- Prefers Slack > email
+- Met at DesignCamp 2025
+- Married to Dave (also PM)
+- [[johnson-project]] for context
 ```
 
 ---
 
-## Troubleshooting
+## What Your AI Sees
 
-**"The librarian won't start."**
-Check the logs: `journalctl --user -u brainpass-librarian -n 50`. Most common issue: missing API key in `.env`.
+When BrainPass finds relevant notes, your AI gets something like this:
 
-**"My AI isn't using BrainPass."**
-Did you give it the magic instruction? Most likely no. AIs won't call tools you don't tell them about.
+```
+Relevant notes from your vault:
 
-**"It says my vault has 0 files."**
-You haven't written any notes yet. Open Obsidian, make a note in any folder, save it. Try again.
+--- From: daily/2026-04-14.md ---
+Had call with Sarah about Johnson wireframes. She needs them by 
+Friday EOD. She's stressed about the timeline.
 
-**"It's slow."**
-If you're using the cloud LLM, your bottleneck is the LLM's response time, not BrainPass. If you're using local models, try a smaller one or a faster machine.
+--- From: projects/johnson.md ---
+Wireframes: 80% done. Need to finish mobile breakpoint. 
+Deadline: Friday Apr 18.
 
-**"I want to switch LLMs."**
-Edit `~/BrainPass/config/.env`, change `LLM_PROVIDER` and `LLM_MODEL`, restart the librarian: `systemctl --user restart brainpass-librarian`. Your notes don't move.
+--- From: people/sarah.md ---
+- PM on Johnson wireframes
+- Available Tue/Thu only
+- Prefers Slack
+```
 
----
+Your AI reads this and answers: *"According to your notes, the Johnson wireframes are 80% done with the mobile breakpoint remaining. Sarah (who prefers Slack) needs them by Friday EOD and seemed stressed about the timeline in yesterday's call."*
 
-## What BrainPass Is Not
-
-- **Not a chatbot.** It's the memory *behind* a chatbot. You still need an AI to talk to.
-- **Not a vector database.** It uses plain keyword search. Fast, simple, and good enough for personal notebooks. If you want embeddings later, you can add them.
-- **Not cloud-hosted.** It runs on your machine. That's the point.
-- **Not a replacement for thinking.** If you write garbage notes, you get garbage answers. Write good notes.
-
----
-
-## Documentation
-
-- `docs/INSTALL.md` — The long-form install guide with every edge case
-- `docs/PAPER.md` — The technical/academic write-up
-- `docs/USE_CASES.md` — Real examples of what people use it for
+That's the magic. Real context. Real answers.
 
 ---
 
-## Security
+## Real Use Cases (Why Devs Actually Want This)
 
-- No credentials live in this repo. Ever. All keys go in `.env` which is `.gitignore`'d.
-- Your vault is markdown on your filesystem. It doesn't leave unless you send it.
-- The librarian only binds to `127.0.0.1` (localhost) by default. It's not reachable from the internet unless you change that on purpose.
-- If you use NotebookLM, understand that Google reads those notes. Don't put secrets in the vault if that's a problem.
+**Building a product:**
+- Store architecture decisions in `decisions/`
+- Link to API docs in `sources/`
+- Track user feedback in `feedback/`
+- AI remembers why you chose Postgres over Mongo
+
+**Managing a team:**
+- `people/` folder with everyone's preferences, quirks, timezones
+- `meetings/` with notes from every 1:1
+- AI knows who hates morning meetings, who's the expert on X
+
+**Learning something new:**
+- `topics/rust.md` with concepts you're learning
+- `sources/` with articles and tutorials
+- AI builds on what you've already studied
+
+**Content creation:**
+- `ideas/` for half-baked thoughts
+- `drafts/` for in-progress work
+- `published/` for finished pieces
+- AI knows your style, your past work, your audience
 
 ---
 
-## License
+## Troubleshooting (Because Something Always Breaks)
 
-MIT. Build your own brain. Fork it. Modify it. Ship it. Just don't blame us if your AI starts talking back.
+**"Librarian won't start"**
+```bash
+journalctl --user -u brainpass-librarian -n 50
+# Probably: missing API key in config/.env
+```
+
+**"My AI isn't using BrainPass"**
+- Did you paste the magic instruction into your AI's system prompt?
+- This is the #1 fix. Do it.
+
+**"Vault shows 0 files"**
+- You haven't written any notes yet. Open Obsidian, make a note, save it.
+
+**"It's slow"**
+- Groq free tier is fast. If using local models, try a smaller one.
+
+**"I want to switch LLMs"**
+- Edit `config/.env`, change provider/model, restart: `systemctl --user restart brainpass-librarian`
+- Your notes don't move. Your AI doesn't forget.
 
 ---
 
-*BrainPass is the open-source version of an agent memory system that's been running in production on one very specific setup for months. It works. It's boring tech on purpose. No vector DB trickery, no LangChain lock-in, no paid SaaS middleman. Just notes and a librarian.*
+## Security (Your Data Is Yours)
+
+- ✅ No credentials in this repo — `.credentials` and `.env` are gitignored
+- ✅ Your vault is local markdown — doesn't leave your machine
+- ✅ Librarian binds to `127.0.0.1` (localhost) — not internet-accessible
+- ✅ NotebookLM is optional — Google only sees vault if you enable it
+- ✅ You can audit everything — it's just text files
+
+---
+
+## Architecture (For the Curious)
+
+```
+┌─────────────────────────────────────────┐
+│           Your LLM                    │
+│   (Claude, GPT, Kimi, Local)          │
+└──────────────┬──────────────────────────┘
+               │ POST /recall
+               ▼
+┌─────────────────────────────────────────┐
+│      BrainPass Librarian                │
+│   (Python HTTP server on :7778)         │
+│   - Receives queries from LLM           │
+│   - Searches vault (keyword/FTS5)     │
+│   - Returns relevant note snippets      │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│      Your Obsidian Vault                │
+│   (Markdown files in ~/BrainPass/)      │
+│   - daily/ — dated logs                 │
+│   - projects/ — active work             │
+│   - people/ — contacts, preferences     │
+│   - topics/ — knowledge bases           │
+│   - sources/ — references, articles     │
+└─────────────────────────────────────────┘
+```
+
+The whole thing is ~300 lines of Python. No magic. Just good plumbing.
+
+---
+
+## Contributing
+
+This is the sanitized, open-source version of a memory system that's been running in production for months.
+
+Fork it. Break it. Improve it. Ship your own version.
+
+MIT License. Build your own brain.
+
+---
+
+## Links
+
+- **Repo:** https://github.com/coderook520/BrainPass
+- **Issues:** https://github.com/coderook520/BrainPass/issues
+- **Obsidian:** https://obsidian.md
+- **NotebookLM:** https://notebooklm.google.com
+- **Groq:** https://console.groq.com (free tier)
+
+---
+
+*Made by developers who were tired of explaining the same shit to their AI every single day.*
+
+🧠⚡ **Give your AI a memory.**
