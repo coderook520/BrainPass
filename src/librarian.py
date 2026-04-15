@@ -92,6 +92,23 @@ def load_memory_manual():
 
 
 # ─── FILE SEARCH ─────────────────────────────────────────────────────
+_brain_count_cache = {"count": 0, "last_check": 0}
+
+def count_brain_files():
+    global _brain_count_cache
+    import time
+    now = time.time()
+    if now - _brain_count_cache["last_check"] < 300:
+        return _brain_count_cache["count"]
+    
+    count = 0
+    if VAULT_PATH.exists():
+        count = len(list(VAULT_PATH.rglob("*.md")))
+    
+    _brain_count_cache = {"count": count, "last_check": now}
+    return count
+
+
 def search_files(query, max_results=5):
     results = []
     query_lower = query.lower()
@@ -241,7 +258,8 @@ class LibrarianHandler(BaseHTTPRequestHandler):
                 "vault_path": str(VAULT_PATH),
                 "port": SERVE_PORT,
                 "llm_provider": LLM_PROVIDER,
-                "keys_configured": len(API_KEYS)
+                "keys_configured": len(API_KEYS),
+                "files_indexed": count_brain_files()
             })
         elif path == "/query":
             query = parsed.get("q", [""])[0]
