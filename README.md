@@ -4,6 +4,21 @@
 
 ### your AI finally remembers shit.
 
+**works with any AI. Claude, GPT, Gemini, Llama, Mistral, Ollama, LM Studio — if it speaks text, BrainPass gives it memory.**
+
+<br>
+
+<img src="https://img.shields.io/badge/works_with-any_AI-10B981?style=for-the-badge&labelColor=1E1B4B">
+
+<img src="https://img.shields.io/badge/Claude-CC785C?style=flat-square&logo=anthropic&logoColor=white">
+<img src="https://img.shields.io/badge/GPT-412991?style=flat-square&logo=openai&logoColor=white">
+<img src="https://img.shields.io/badge/Gemini-4285F4?style=flat-square&logo=google&logoColor=white">
+<img src="https://img.shields.io/badge/Llama-0467DF?style=flat-square&logo=meta&logoColor=white">
+<img src="https://img.shields.io/badge/Mistral-FF7000?style=flat-square">
+<img src="https://img.shields.io/badge/Ollama-000000?style=flat-square">
+<img src="https://img.shields.io/badge/LM_Studio-6C47FF?style=flat-square">
+<img src="https://img.shields.io/badge/any_OpenAI--compatible-gray?style=flat-square">
+
 <br>
 
 <img src="https://img.shields.io/badge/ships-today-EC4899?style=flat-square&labelColor=1E1B4B">
