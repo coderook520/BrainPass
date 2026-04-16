@@ -8,6 +8,12 @@ notes into a citeable answer via your configured LLM provider.
 Search engine: BM25 chunk-based scoring with optional frontmatter metadata,
 recency/frequency signals, and configurable stopwords.
 
+Recall architecture:
+  1. DECODE — LLM parses the raw message (message-primary, topic is secondary)
+  2. DUAL SEARCH — LLM-decoded terms + raw keyword fallback via BM25
+  3. COMPILE — LLM validates results and builds final context
+  4. CACHE — only HIGH/MEDIUM confidence results cached (LOW/GUESS never cached)
+
 Supported providers: groq, openai, anthropic, local (OpenAI-compatible).
 Stdlib only — no pip install needed.
 """
@@ -22,7 +28,7 @@ import re
 import signal
 import urllib.request
 from dataclasses import dataclass
-from datetime import date as _date_cls
+from datetime import date as _date_cls, datetime
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs
@@ -77,7 +83,8 @@ else:
 
 # Paths
 VAULT_PATH = Path(os.environ.get("VAULT_PATH", "~/BrainPass/vault")).expanduser()
-CACHE_FILE = Path(os.environ.get("CACHE_PATH", "/tmp/brainpass-topic.txt"))
+TOPIC_FILE = Path(os.environ.get("TOPIC_PATH", "/tmp/brainpass-topic.txt"))
+SESSION_CACHE_FILE = Path(os.environ.get("SESSION_CACHE_PATH", "/tmp/brainpass-session-cache.json"))
 
 # Optional: NotebookLM notebook URL for deeper semantic search.
 NOTEBOOKLM_URL = os.environ.get("NOTEBOOKLM_URL", "").strip()
@@ -96,6 +103,10 @@ SERVE_PORT = int(os.environ.get("LIBRARIAN_PORT", 7778))
 # Agent identity defaults (used only when SOUL.md is absent)
 AGENT_NAME = os.environ.get("AGENT_NAME", "Assistant")
 AGENT_ROLE = os.environ.get("AGENT_ROLE", "Helpful AI")
+
+# Cache settings
+CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL", "600"))  # 10 minutes
+TOPIC_TTL_SECONDS = int(os.environ.get("TOPIC_TTL", "600"))  # 10 minutes
 
 
 # ─── SEARCH TUNING (with range clamping) ────────────────────────────
@@ -707,6 +718,95 @@ def call_llm(messages, max_tokens=2000):
     return json.dumps({"error": f"All keys failed. Last: {last_error}"})
 
 
+# ─── TOPIC TRACKING ─────────────────────────────────────────────────
+def load_topic():
+    """Load current topic from disk. Returns 'none' if stale or missing."""
+    try:
+        if TOPIC_FILE.exists():
+            age = time.time() - TOPIC_FILE.stat().st_mtime
+            if age > TOPIC_TTL_SECONDS:
+                TOPIC_FILE.unlink(missing_ok=True)
+                return "none"
+            return TOPIC_FILE.read_text().strip() or "none"
+    except Exception:
+        pass
+    return "none"
+
+
+def save_topic(topic):
+    try:
+        TOPIC_FILE.write_text(topic)
+    except Exception:
+        pass
+
+
+# ─── SESSION CACHE ───────────────────────────────────────────────────
+def load_session_cache():
+    cache = None
+    try:
+        if SESSION_CACHE_FILE.exists():
+            cache = json.loads(SESSION_CACHE_FILE.read_text())
+    except Exception:
+        cache = None
+    if not isinstance(cache, dict):
+        cache = {}
+    cache.setdefault("entries", [])
+    cache.setdefault("last_topic", "none")
+    return cache
+
+
+def save_session_cache(cache):
+    try:
+        SESSION_CACHE_FILE.write_text(json.dumps(cache, indent=2))
+    except Exception:
+        pass
+
+
+def clear_session_cache():
+    try:
+        SESSION_CACHE_FILE.unlink(missing_ok=True)
+        TOPIC_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def find_cached_entry(cache, topic):
+    """Find a cached HIGH/MEDIUM entry matching this topic.
+    Requires exact match or 90% word overlap with 3+ overlapping words."""
+    topic_lower = topic.lower().strip()
+    if not topic_lower:
+        return None
+    topic_words = set(topic_lower.split())
+    now = time.time()
+    best = None
+    best_ts = 0.0
+
+    for entry in cache.get("entries", []):
+        if entry.get("confidence", "low") not in ("high", "medium"):
+            continue
+        try:
+            entry_ts = datetime.fromisoformat(entry.get("timestamp", "")).timestamp()
+        except Exception:
+            continue
+        age = now - entry_ts
+        if age > CACHE_TTL_SECONDS or age < -60:
+            continue
+        cached_topic = entry.get("topic", "").lower().strip()
+        if not cached_topic:
+            continue
+        if cached_topic == topic_lower:
+            if entry_ts > best_ts:
+                best, best_ts = entry, entry_ts
+            continue
+        cached_words = set(cached_topic.split())
+        if topic_words and cached_words:
+            overlap = len(topic_words & cached_words)
+            need = max(3, int(len(topic_words) * 0.9 + 0.5))
+            if overlap >= need and entry_ts > best_ts:
+                best, best_ts = entry, entry_ts
+    return best
+
+
 # ─── RECALL ENGINE ───────────────────────────────────────────────────
 _SKIP_PATTERNS = [
     re.compile(r"^(ok|okay|cool|nice|yeah|yes|no|hi|hey|hello|bye|thanks?)$", re.I),
@@ -717,54 +817,217 @@ _SKIP_PATTERNS = [
 
 
 def recall(raw_message, topic_hint=""):
-    topic = topic_hint or raw_message[:100]
+    """
+    Three-phase recall with dual search strategy.
+
+    PHASE 1 — DECODE: LLM parses message (message-primary, topic secondary)
+    PHASE 2 — DUAL SEARCH: LLM-decoded terms + raw keyword fallback via BM25
+    PHASE 3 — COMPILE: LLM validates results and builds final context
+
+    Only HIGH/MEDIUM confidence results are cached.
+    """
+    topic = topic_hint if topic_hint and topic_hint != "none" else "none"
     stripped = raw_message.strip()
 
     if any(p.match(stripped) for p in _SKIP_PATTERNS) or len(stripped) < 10:
         return {"result": "", "topic": topic, "skipped": True}
 
-    search_results = search_files(topic, max_results=5)
+    cache = load_session_cache()
 
-    if not search_results:
+    # ═══ PHASE 1: DECODE ═══════════════════════════════════════════════
+    # Message is PRIMARY. Previous topic is only for pronoun resolution.
+    decode_prompt = (
+        f"MESSAGE: {raw_message}\n\n"
+        f"Parse this message. Output the following fields exactly:\n\n"
+        f"INTENDED: [fix typos, expand slang/abbreviations]\n"
+        f"ENTITIES: [named people, projects, files, concepts — comma-separated]\n"
+        f"INTENT: [one word: retrieve | build | fix | decide | remember | update | vent | plan | status]\n"
+        f"SEARCH_TERMS: [3-5 precise keywords to search the knowledge base, comma-separated on this line]\n"
+        f"TOPIC: [what this message is about in 8 words or less]\n"
+        f"TOPIC_CHANGED: [yes | no — did the user switch to a new subject?]\n\n"
+        f'Previous topic for pronoun resolution only: "{topic}"\n'
+        f"Use the previous topic ONLY to resolve \"it\", \"that\", \"her\", \"this\". "
+        f"If the message introduces ANY new subject, ignore the previous topic entirely and set TOPIC_CHANGED to yes."
+    )
+
+    decode_system = (
+        "You are a message parser. Extract search keywords from the MESSAGE. "
+        "The message is always primary — previous topic is only for resolving pronouns. "
+        "Output the exact format requested. No chat, no explanation."
+    )
+
+    decode_response = call_llm(
+        [{"role": "system", "content": decode_system},
+         {"role": "user", "content": decode_prompt}],
+        max_tokens=400
+    )
+
+    # Parse decode response
+    new_topic = topic
+    search_terms = []
+    intent = "retrieve"
+    entities = []
+    topic_changed = False
+
+    if decode_response and not decode_response.startswith("{"):
+        for line in decode_response.split('\n'):
+            line = line.strip()
+            if line.startswith('TOPIC:'):
+                new_topic = line.split(':', 1)[1].strip()
+            elif line.startswith('TOPIC_CHANGED:'):
+                topic_changed = 'yes' in line.lower()
+            elif line.startswith('INTENT:'):
+                intent = line.split(':', 1)[1].strip().lower()
+            elif line.startswith('ENTITIES:'):
+                entities = [e.strip() for e in line.split(':', 1)[1].split(',') if e.strip()]
+            elif line.startswith('SEARCH_TERMS:'):
+                terms_raw = line.split(':', 1)[1].strip()
+                search_terms = [t.strip() for t in terms_raw.split(',') if t.strip() and len(t.strip()) > 1]
+
+    if not topic_changed and topic != "none":
+        new_topic = topic
+
+    if not search_terms:
+        search_terms = entities[:3] if entities else [raw_message[:100]]
+
+    # ═══ SESSION CACHE CHECK ═══════════════════════════════════════════
+    cached_entry = find_cached_entry(cache, new_topic)
+    if cached_entry and cached_entry.get("context"):
         return {
-            "result": "",
-            "topic": topic,
-            "files_searched": 0,
-            "notebooklm_url": NOTEBOOKLM_URL or None,
+            "result": cached_entry.get("context", ""),
+            "topic": cached_entry.get("topic", new_topic),
+            "sources": cached_entry.get("files", []),
+            "intent": intent,
+            "confidence": "cached",
             "score_method": "bm25-chunked",
         }
 
-    context = ""
-    for i, result in enumerate(search_results, 1):
-        context += f"\n--- Source {i}: {result['file']} ---\n{result['preview']}\n"
+    # ═══ PHASE 2: DUAL SEARCH (BM25) ═════════════════════════════════
+    # Strategy 1: LLM-decoded search terms
+    all_matches = []
+    for term in search_terms[:5]:
+        all_matches.extend(search_files(term, max_results=5))
 
+    for entity in entities[:3]:
+        if entity and len(entity) > 2:
+            all_matches.extend(search_files(entity, max_results=3))
+
+    # Strategy 2: Raw keyword fallback (LLM-independent safety net)
+    raw_keywords = [w for w in tokenize(raw_message) if len(w) > 2]
+    if raw_keywords:
+        raw_query = " ".join(raw_keywords[:5])
+        raw_matches = search_files(raw_query, max_results=5)
+        for rm in raw_matches:
+            if rm.get("score", 0) >= 0.5:
+                all_matches.append(rm)
+
+    # Deduplicate by file
+    seen = set()
+    unique_matches = []
+    for m in all_matches:
+        key = m.get("file", "")
+        if key not in seen:
+            seen.add(key)
+            unique_matches.append(m)
+    unique_matches.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+    if not unique_matches:
+        return {
+            "result": "",
+            "topic": new_topic,
+            "sources": [],
+            "intent": intent,
+            "confidence": "none",
+            "score_method": "bm25-chunked",
+        }
+
+    # Build context from top matches
+    context_parts = []
+    source_names = []
+    for i, match in enumerate(unique_matches[:6], 1):
+        fname = match.get("file", "unknown")
+        source_names.append(Path(fname).stem)
+        context_parts.append(f"--- Source {i}: {fname} ---\n{match['preview']}")
+    combined = "\n\n".join(context_parts)
+
+    # ═══ PHASE 3: COMPILE ═════════════════════════════════════════════
     soul = load_soul()
     memory = load_memory_manual()
 
-    messages = [
-        {"role": "system", "content": f"{soul}\n\nJob Manual:\n{memory}"},
-        {"role": "user", "content": (
-            f"Given this user message and sources, extract relevant information:\n\n"
-            f"USER MESSAGE: {raw_message}\n\n"
-            f"SEARCH TOPIC: {topic}\n\n"
-            f"SOURCES:{context}\n\n"
-            f"Return concise facts, citing sources [1], [2], etc."
-        )},
-    ]
+    compile_prompt = (
+        f"TOPIC: {new_topic}\n"
+        f"ORIGINAL MESSAGE: {raw_message}\n"
+        f"INTENT: {intent}\n"
+        f"ENTITIES: {', '.join(entities)}\n\n"
+        f"KNOWLEDGE BASE PAGES FOUND:\n{combined}\n\n"
+        f"Validate and compile:\n"
+        f"1. Do these pages answer what was asked? Which are relevant, which are noise?\n"
+        f"2. Is any information stale?\n"
+        f"3. What's missing?\n"
+        f"4. Rate confidence: HIGH (direct match) / MEDIUM (probable) / LOW (reaching) / GUESS (barely related)\n\n"
+        f"Output format (strict):\n"
+        f"CONFIDENCE: [HIGH/MEDIUM/LOW/GUESS]\n"
+        f"GAPS: [what's missing, or \"none\"]\n"
+        f"CONTEXT: [Your compiled answer — max 800 chars. Include [[source]] references. "
+        f"If pages don't answer the question, say \"No relevant information found.\"]"
+    )
 
-    llm_response = call_llm(messages)
+    compile_response = call_llm(
+        [{"role": "system", "content": f"{soul}\n\nJob Manual:\n{memory}"},
+         {"role": "user", "content": compile_prompt}],
+        max_tokens=400
+    )
 
-    try:
-        CACHE_FILE.write_text(llm_response)
-    except Exception:
-        pass
+    # Parse compile response
+    context = ""
+    confidence = "medium"
+    gaps = ""
+
+    if compile_response and not compile_response.startswith("{"):
+        for line in compile_response.split('\n'):
+            ls = line.strip()
+            if ls.startswith('CONFIDENCE:'):
+                confidence = ls.split(':', 1)[1].strip().lower()
+            elif ls.startswith('GAPS:'):
+                gaps = ls.split(':', 1)[1].strip()
+
+        context_match = re.search(r'CONTEXT:\s*(.*)', compile_response, re.DOTALL)
+        if context_match:
+            context = context_match.group(1).strip()
+            if context.lower() in ("none", "no relevant information found."):
+                context = ""
+
+        if not context and "none" not in compile_response.lower()[:50]:
+            lines = compile_response.split('\n')
+            content_lines = [l for l in lines if not l.strip().startswith(('CONFIDENCE:', 'GAPS:', 'TOPIC:'))]
+            fallback = '\n'.join(content_lines).strip()
+            if len(fallback) > 30:
+                context = fallback[:800]
+
+    if confidence in ('low', 'guess') and gaps and gaps.lower() != 'none':
+        context = f"[{confidence.upper()} confidence — gaps: {gaps}] {context}"
+
+    # ═══ CACHE (HIGH/MEDIUM only) ═════════════════════════════════════
+    if context and len(context) > 20 and confidence in ('high', 'medium'):
+        cache["entries"].append({
+            "topic": new_topic,
+            "files": source_names,
+            "context": context,
+            "confidence": confidence,
+            "timestamp": datetime.now().isoformat(),
+        })
+        cache["last_topic"] = new_topic
+        save_session_cache(cache)
+
+    if topic_changed or topic == "none":
+        save_topic(new_topic)
 
     return {
-        "result": llm_response,
-        "topic": topic,
-        "files_searched": len(search_results),
-        "sources": [r["file"] for r in search_results],
-        "notebooklm_url": NOTEBOOKLM_URL or None,
+        "result": context,
+        "topic": new_topic,
+        "sources": source_names,
+        "intent": intent,
+        "confidence": confidence,
         "score_method": "bm25-chunked",
     }
 
@@ -818,9 +1081,12 @@ class LibrarianHandler(BaseHTTPRequestHandler):
 
         if path == "/recall":
             message = data.get("message", "")
-            topic = data.get("topic", "")
+            topic = data.get("topic", "") or load_topic()
             result = recall(message, topic_hint=topic)
             self._send_json(result)
+        elif path == "/clear-cache":
+            clear_session_cache()
+            self._send_json({"status": "cleared"})
         else:
             self._send_json({"error": "unknown endpoint"}, status=404)
 
