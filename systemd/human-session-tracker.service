@@ -1,0 +1,22 @@
+[Unit]
+Description=BrainPass Human Session Tracker
+Documentation=https://github.com/coderook520/BrainPass/blob/master/docs/gate.md
+After=multi-user.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+ExecStart=%h/.local/brainpass/bin/human-session-tracker
+Restart=always
+RestartSec=2
+WatchdogSec=30
+NotifyAccess=main
+StandardOutput=journal
+StandardError=journal
+
+# Optional: override the regex of AI-CLI processes to watch for
+# (default: claude|cursor|gemini|windsurf|aider|continue|cline|cody|copilot)
+# Environment=BP_INTERACTIVE_PROCS=claude|cursor|my-custom-cli
+
+[Install]
+WantedBy=default.target
