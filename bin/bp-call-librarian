@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# bp-call-librarian — wrapper that fetches a human-session token from the
+# tracker and adds X-Human-Session-Token to the curl call.
+#
+# Usage: bp-call-librarian <URL> [curl args...]
+#
+# Exit codes:
+#   0  success (whatever curl exit code returned)
+#   2  tracker unreachable OR no active human session (non-interactive caller)
+
+set -euo pipefail
+
+URL="${1:?usage: bp-call-librarian <url> [curl args...]}"
+shift || true
+
+RUN_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+SOCK="$RUN_DIR/bp-human-session.sock"
+
+if [ ! -S "$SOCK" ]; then
+    echo "bp-call-librarian: tracker socket missing — non-interactive caller" >&2
+    exit 2
+fi
+
+TOKEN="$(printf 'GETTOKEN\n' | socat -t 2 - "UNIX-CONNECT:$SOCK" 2>/dev/null | head -1 || true)"
+
+if [ -z "${TOKEN:-}" ]; then
+    echo "bp-call-librarian: empty token (tracker says no active human session)" >&2
+    exit 2
+fi
+
+exec curl --fail-with-body --connect-timeout 2 --max-time 30 \
+    -H "X-Human-Session-Token: $TOKEN" "$@" "$URL"

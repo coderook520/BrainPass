@@ -361,8 +361,22 @@ Your data is yours. That's not a marketing line, it's the architecture:
 - **Vault lives on your disk.** Markdown files in `~/BrainPass/vault/`. Doesn't leave unless you send it.
 - **Librarian binds to `127.0.0.1` only.** Not reachable from the internet unless you change that on purpose.
 - **NotebookLM is opt-in.** Google only sees your notes if you upload them yourself.
+- **Human-session gate is default ON.** Autonomous callers (cron jobs, test loops, rogue agent frameworks, supply-chain compromise) can't drain your LLM API budget while you're away from the keyboard — `/recall` only answers when an AI CLI is actively running under your user with a real TTY. Everything else gets `403`.
 
 If you can read the files in `~/BrainPass/`, you can audit every byte your AI has access to. No black box.
+
+### the autonomous-burn problem (why the gate exists)
+
+The librarian listens on `127.0.0.1:7778` with **no authentication** — that's how any AI tool on your box can talk to it without configuration. But "no auth" also means any *other* local process can hit it: a misbehaving cron job, an IDE autocomplete on a loop, an agent framework spawning background workers, a supply-chain compromise in some random npm package you installed last Tuesday. Every one of those calls goes to your Groq/OpenAI/Anthropic key. Your budget bleeds 24/7 whether you're at the keyboard or not.
+
+The human-session gate fixes this. A lightweight daemon (`human-session-tracker`) watches for AI CLI processes (`claude`, `cursor`, `gemini`, `windsurf`, `aider`, `continue`, `cline`, `cody`, `copilot` — configurable regex). When one is running with a real TTY, the daemon issues short-lived HMAC-signed tickets (30s TTL, secret rotates on every daemon restart) over a unix socket. The librarian rejects any request without a valid, non-expired ticket.
+
+**What's gated:** `/recall`, `/query`, `/dreams`, `/predictions` — every endpoint that spends LLM tokens.
+**What's open:** `/health`, `/status`, `/clear-cache` — local probes with no LLM call.
+
+The default hook (`hooks/brainpass-inject.sh`) and CLI helper (`bin/bp-call-librarian`) grab tickets automatically — if you're driving an AI CLI, you never notice the gate. If you want to disable it (not recommended), set `BP_GATE_DISABLED=1` in `config/.env` and restart the librarian.
+
+Full architecture, ticket format, troubleshooting, and the 19-test verification suite live in [`docs/gate.md`](docs/gate.md).
 
 ---
 

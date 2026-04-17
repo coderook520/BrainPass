@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Human session tracker — watches for an active AI CLI process (claude,
+cursor, gemini, windsurf, etc.) attached to a real TTY, maintains a flag
+file, and serves HMAC-signed tickets over a unix socket.
+
+Files it manages under $XDG_RUNTIME_DIR (defaults to /run/user/$UID):
+    bp-human-session.active   — mtime < 60s == fresh
+    bp-human-session.secret   — 32-byte HMAC key, regenerated per-start
+    bp-human-session.sock     — unix socket; send "GETTOKEN\\n" to get a ticket
+
+Interactive detection: pgrep -u $UID -f "<regex>" against processes that
+have a real TTY (/dev/pts/*, /dev/tty*). Regex is controlled by env var
+BP_INTERACTIVE_PROCS (default matches claude/cursor/gemini/windsurf/code/aider).
+
+Systemd: Type=notify; sends READY=1 after initial scan, WATCHDOG=1 every 10s.
+"""
+import base64
+import hashlib
+import hmac
+import os
+import socket
+import subprocess
+import sys
+import threading
+import time
+
+UID = os.getuid()
+RUN_DIR = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{UID}")
+SECRET_PATH = f"{RUN_DIR}/bp-human-session.secret"
+FLAG_PATH = f"{RUN_DIR}/bp-human-session.active"
+SOCK_PATH = f"{RUN_DIR}/bp-human-session.sock"
+TICKET_TTL = int(os.environ.get("BP_TICKET_TTL", "30"))
+POLL_INTERVAL = int(os.environ.get("BP_POLL_INTERVAL", "10"))
+
+DEFAULT_INTERACTIVE_REGEX = (
+    r"\b(claude|cursor|gemini|windsurf|aider|continue|cline|cody|copilot)\b"
+)
+INTERACTIVE_REGEX = os.environ.get(
+    "BP_INTERACTIVE_PROCS", DEFAULT_INTERACTIVE_REGEX
+)
+
+
+def _log(msg):
+    sys.stderr.write(f"[bp-tracker] {msg}\n")
+    sys.stderr.flush()
+
+
+def _sd_notify(state):
+    sock_path = os.environ.get("NOTIFY_SOCKET")
+    if not sock_path:
+        return
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+            if sock_path.startswith("@"):
+                s.connect("\0" + sock_path[1:])
+            else:
+                s.connect(sock_path)
+            s.sendall(state.encode())
+    except OSError:
+        pass
+
+
+def _gen_secret():
+    os.makedirs(RUN_DIR, mode=0o700, exist_ok=True)
+    data = os.urandom(32)
+    fd = os.open(
+        SECRET_PATH + ".tmp",
+        os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+        0o600,
+    )
+    try:
+        os.write(fd, data)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.replace(SECRET_PATH + ".tmp", SECRET_PATH)
+    _log("secret regenerated")
+    return data
+
+
+def _read_secret_bytes():
+    fd = os.open(SECRET_PATH, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        return os.read(fd, 256)
+    finally:
+        os.close(fd)
+
+
+def _issue_ticket():
+    now = int(time.time())
+    payload = f"{os.getpid()}:{now}:{now + TICKET_TTL}"
+    payload_b64 = base64.urlsafe_b64encode(payload.encode()).decode("ascii").rstrip("=")
+    secret = _read_secret_bytes()
+    sig = hmac.new(secret, payload_b64.encode(), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+
+def _is_interactive():
+    """Return True iff any AI CLI process with a real TTY is running as us."""
+    try:
+        out = subprocess.run(
+            ["pgrep", "-u", str(UID), "-a", "-f", INTERACTIVE_REGEX],
+            check=False, capture_output=True, text=True, timeout=2,
+        ).stdout
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+    pids = []
+    for line in out.splitlines():
+        parts = line.split(None, 1)
+        if parts and parts[0].isdigit():
+            pids.append(int(parts[0]))
+    if not pids:
+        return False
+    for pid in pids:
+        try:
+            tty = os.readlink(f"/proc/{pid}/fd/0")
+            if tty.startswith("/dev/pts/") or tty.startswith("/dev/tty"):
+                return True
+        except (FileNotFoundError, PermissionError, OSError):
+            continue
+    return False
+
+
+def _touch_flag():
+    try:
+        fd = os.open(FLAG_PATH, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(fd, b"1")
+        finally:
+            os.close(fd)
+        now = time.time()
+        os.utime(FLAG_PATH, (now, now))
+    except OSError as e:
+        _log(f"touch_flag error: {e}")
+
+
+def _socket_server():
+    try:
+        os.unlink(SOCK_PATH)
+    except FileNotFoundError:
+        pass
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(SOCK_PATH)
+    os.chmod(SOCK_PATH, 0o600)
+    sock.listen(16)
+    _log(f"serving on {SOCK_PATH}")
+    while True:
+        try:
+            conn, _ = sock.accept()
+        except OSError:
+            continue
+        threading.Thread(target=_handle_conn, args=(conn,), daemon=True).start()
+
+
+def _handle_conn(conn):
+    try:
+        conn.settimeout(2)
+        data = conn.recv(64).decode("ascii", "replace").strip()
+        if data == "GETTOKEN":
+            if not _is_interactive():
+                conn.sendall(b"")
+                return
+            _touch_flag()
+            conn.sendall((_issue_ticket() + "\n").encode())
+        else:
+            conn.sendall(b"")
+    except OSError:
+        pass
+    finally:
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
+def main():
+    _gen_secret()
+    if _is_interactive():
+        _touch_flag()
+    threading.Thread(target=_socket_server, daemon=True).start()
+    _sd_notify("READY=1")
+    _log("ready")
+    while True:
+        if _is_interactive():
+            _touch_flag()
+        _sd_notify("WATCHDOG=1")
+        time.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(0)

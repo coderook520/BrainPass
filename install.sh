@@ -105,6 +105,35 @@ if [ ! -f "$INSTALL_DIR/vault/people/EXAMPLE.md" ] && [ -f "$REPO_ROOT/vault/peo
     cp "$REPO_ROOT/vault/people/EXAMPLE.md" "$INSTALL_DIR/vault/people/EXAMPLE.md"
 fi
 
+# ─── Gate package (bin/, lib/, systemd/) ─────────────────────────────
+# The human-session gate stops autonomous callers (cron, buggy loops,
+# agent frameworks, supply-chain surprises) from draining your LLM budget.
+# Default ON. Set BP_GATE_DISABLED=1 in config/.env to disable (not recommended).
+if [ "$REPO_ROOT" != "$INSTALL_DIR" ]; then
+    for dir in bin lib systemd tests; do
+        if [ -d "$REPO_ROOT/$dir" ]; then
+            echo "[..] copying $dir/"
+            rm -rf "$INSTALL_DIR/$dir"
+            cp -r "$REPO_ROOT/$dir" "$INSTALL_DIR/$dir"
+        fi
+    done
+    chmod +x "$INSTALL_DIR/bin/"* 2>/dev/null || true
+fi
+
+# Tracker systemd unit — install the service file, auto-start if available
+TRACKER_UNIT="$HOME/.config/systemd/user/human-session-tracker.service"
+if [ -f "$INSTALL_DIR/systemd/human-session-tracker.service" ]; then
+    sed "s|%h/.local/brainpass/bin/human-session-tracker|$INSTALL_DIR/bin/human-session-tracker|g" \
+        "$INSTALL_DIR/systemd/human-session-tracker.service" > "$TRACKER_UNIT"
+    echo "[ok] wrote $TRACKER_UNIT"
+    if command -v socat >/dev/null 2>&1; then
+        echo "[ok] socat present (required for bp-call-librarian)"
+    else
+        echo "[warn] socat not installed — bp-call-librarian won't work until you install it"
+        echo "       (Debian/Ubuntu: sudo apt install socat  |  Arch: sudo pacman -S socat)"
+    fi
+fi
+
 # ─── systemd --user service ──────────────────────────────────────────
 SERVICE_FILE="$HOME/.config/systemd/user/brainpass-librarian.service"
 PYTHON_BIN="$(command -v python3)"
@@ -131,6 +160,12 @@ echo "[ok] wrote $SERVICE_FILE"
 
 if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload || true
+    # Enable + start the tracker (the gate depends on it being up)
+    if [ -f "$TRACKER_UNIT" ]; then
+        systemctl --user enable --now human-session-tracker.service 2>/dev/null \
+            && echo "[ok] human-session-tracker started" \
+            || echo "[warn] could not auto-start tracker — run: systemctl --user start human-session-tracker"
+    fi
 else
     echo "[warn] systemctl not found — service file written but not registered"
 fi
@@ -153,6 +188,9 @@ Next:
      (See SETUP-WITH-YOUR-AI.md Step 11.5 — this is the piece that
       makes BrainPass fire on every message automatically instead of
       only when your AI remembers to call it.)
+  5a. Gate status (default ON — blocks autonomous LLM burn):
+       python3 -m unittest discover -s ~/BrainPass/tests -v   # 19 tests
+       See ~/BrainPass/docs/gate.md for architecture + disable instructions.
   6. Optional: upload ~/BrainPass/vault/ to https://notebooklm.google.com
      as a new notebook for deeper semantic search, then set
      NOTEBOOKLM_URL in ~/BrainPass/config/.env to the notebook URL.

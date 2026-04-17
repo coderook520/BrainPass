@@ -1601,11 +1601,40 @@ def get_dreams(limit=10):
 
 
 # ─── HTTP SERVER ─────────────────────────────────────────────────────
-class LibrarianHandler(BaseHTTPRequestHandler):
+
+# ─── Human-session gate (default ON) ─────────────────────────────────
+# Blocks autonomous callers (cron, background agents, buggy loops) from
+# draining your LLM budget. Only requests carrying a valid X-Human-Session-Token
+# (issued by bin/human-session-tracker when an AI CLI is actively running)
+# are allowed through on GATED_* endpoints. OPEN_ALWAYS endpoints stay open.
+#
+# To disable (not recommended), set env var BP_GATE_DISABLED=1.
+# To fully customize, edit GATED_POST / GATED_GET / OPEN_ALWAYS below.
+#
+# See docs/gate.md for architecture.
+import sys as _bp_sys
+import os as _bp_os
+_bp_sys.path.insert(0, _bp_os.path.dirname(_bp_os.path.abspath(__file__)))
+if _bp_os.environ.get("BP_GATE_DISABLED") == "1":
+    class HumanSessionGateMixin:  # no-op pass-through
+        pass
+    GATED_POST = GATED_GET = OPEN_ALWAYS = set()
+else:
+    from bp_gate.gate_mixin import (
+        HumanSessionGateMixin, GATED_POST, GATED_GET, OPEN_ALWAYS,
+    )
+    # LLM-spending endpoints — require a human-session token
+    GATED_POST.update({"/recall"})
+    GATED_GET.update({"/query", "/dreams", "/predictions"})
+    # Probes + local-only ops — never gated
+    OPEN_ALWAYS.update({"/health", "/status", "/clear-cache"})
+# ─────────────────────────────────────────────────────────────────────
+
+class LibrarianHandler(HumanSessionGateMixin, BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-    def do_GET(self):
+    def _do_GET_orig(self):
         parsed = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
         path = self.path.split("?", 1)[0]
 
@@ -1651,7 +1680,7 @@ class LibrarianHandler(BaseHTTPRequestHandler):
         else:
             self._send_json({"error": "unknown endpoint"}, status=404)
 
-    def do_POST(self):
+    def _do_POST_orig(self):
         path = self.path.split("?", 1)[0]
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode() if content_length else "{}"
