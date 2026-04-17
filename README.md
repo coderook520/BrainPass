@@ -378,6 +378,19 @@ The default hook (`hooks/brainpass-inject.sh`) and CLI helper (`bin/bp-call-libr
 
 Full architecture, ticket format, troubleshooting, and the 19-test verification suite live in [`docs/gate.md`](docs/gate.md).
 
+### v3 — the self-feeding brain
+
+v3 closes the loop between you, your AI, your vault, and the open web. **Four new features, all default-on, all individually disable-able:**
+
+- **Write-back** — AI responses get parsed for save-worthy facts. Proposals queue up. One-tap approve (`bp-write review`) and they're in the vault forever. You stop having to type notes to keep it growing.
+- **Temporal awareness** — recent notes outrank old ones (30-day half-life by default). `/changed?since=2026-04-10` surfaces what moved. `/timeline?topic=X` shows the chronological fact evolution — catches "you said Rust 6 months ago but Go last Tuesday."
+- **Self-teaching vault** — `bp-analytics report` shows your hot notes (retrieved constantly), dead notes (never touched in 90d), and query-patterns. The vault gets smarter *from being used*, not just from you adding to it.
+- **Auto-research** — when the vault has nothing (fewer than 2 hits), the librarian fetches Wikipedia + arXiv + DuckDuckGo (+ optional open web), synthesizes with your LLM, and enqueues the findings via write-back. **Next time you ask, it's in your vault.** The cold-start problem is solved.
+
+Combined: the vault grows on your **revealed preference** (topics you actually ask about) without you lifting a finger.
+
+Security: every new surface is locked down — unforgeable XML envelope (prompt-injection-proof), CIDR-aware SSRF blocklist (resolves all A/AAAA records, rejects if any is private, re-pins on redirect), 3s inline research budget (hook-safe), future exceptions never propagate into `/recall`. Full threat model + 84-test verification suite in [`docs/brain-v3.md`](docs/brain-v3.md).
+
 ---
 
 ## architecture, for the curious

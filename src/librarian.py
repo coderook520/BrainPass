@@ -1628,6 +1628,38 @@ else:
     GATED_GET.update({"/query", "/dreams", "/predictions"})
     # Probes + local-only ops — never gated
     OPEN_ALWAYS.update({"/health", "/status", "/clear-cache"})
+
+# ─── Brain v3 feature modules (each optional, each env-gated) ─────────
+_BP_V3_MODULES = []
+try:
+    import bp_routing  # noqa: F401
+    _BP_V3_MODULES.append("routing")
+except ImportError:
+    pass
+try:
+    import bp_writeback
+    bp_writeback.register_endpoints(GATED_POST, GATED_GET)
+    _BP_V3_MODULES.append("writeback")
+except ImportError:
+    pass
+try:
+    import bp_temporal
+    bp_temporal.register_endpoints(GATED_POST, GATED_GET)
+    _BP_V3_MODULES.append("temporal")
+except ImportError:
+    pass
+try:
+    import bp_analytics
+    bp_analytics.register_endpoints(GATED_POST, GATED_GET)
+    _BP_V3_MODULES.append("analytics")
+except ImportError:
+    pass
+try:
+    import bp_research
+    bp_research.register_endpoints(GATED_POST, GATED_GET)
+    _BP_V3_MODULES.append("research")
+except ImportError:
+    pass
 # ─────────────────────────────────────────────────────────────────────
 
 class LibrarianHandler(HumanSessionGateMixin, BaseHTTPRequestHandler):
@@ -1635,6 +1667,16 @@ class LibrarianHandler(HumanSessionGateMixin, BaseHTTPRequestHandler):
         pass
 
     def _do_GET_orig(self):
+        # Try the v3 feature-module router first (writeback, temporal, analytics).
+        # If it matches, it handles the response and returns True.
+        if "routing" in _BP_V3_MODULES:
+            try:
+                from bp_routing import dispatch
+                if dispatch("GET", self.path.split("?", 1)[0], self):
+                    return
+            except Exception:
+                pass  # Fall through to existing handlers on router failure
+
         parsed = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
         path = self.path.split("?", 1)[0]
 
@@ -1681,6 +1723,15 @@ class LibrarianHandler(HumanSessionGateMixin, BaseHTTPRequestHandler):
             self._send_json({"error": "unknown endpoint"}, status=404)
 
     def _do_POST_orig(self):
+        # v3 router first
+        if "routing" in _BP_V3_MODULES:
+            try:
+                from bp_routing import dispatch
+                if dispatch("POST", self.path.split("?", 1)[0], self):
+                    return
+            except Exception:
+                pass
+
         path = self.path.split("?", 1)[0]
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode() if content_length else "{}"
@@ -1691,10 +1742,52 @@ class LibrarianHandler(HumanSessionGateMixin, BaseHTTPRequestHandler):
             data = {}
 
         if path == "/recall":
+            import time as _time
+            _t0 = _time.monotonic()
             message = data.get("message", "")
             topic = data.get("topic", "") or load_topic()
             result = recall(message, topic_hint=topic)
+
+            # v3: auto-research (default ON, fires when vault-hits < threshold)
+            research_result = None
+            if "research" in _BP_V3_MODULES and message:
+                try:
+                    vault_hits = len(result.get("sources", [])) if isinstance(result, dict) else 0
+                    research_result = bp_research.run_inline_or_background(message, vault_hits=vault_hits)
+                    if research_result and not research_result.get("error"):
+                        result["auto_research"] = {
+                            "answer": research_result.get("answer"),
+                            "citations": research_result.get("citations", []),
+                            "background": research_result.get("background", False),
+                            "cost_usd_today_24h": bp_research.cost_tracker.rolling_totals().get("24h_usd", 0.0) if hasattr(bp_research, "cost_tracker") else 0.0,
+                        }
+                except Exception:
+                    pass
+
+            # v3: analytics recorder (privacy-scrubbed)
+            if "analytics" in _BP_V3_MODULES:
+                try:
+                    duration_ms = int((_time.monotonic() - _t0) * 1000)
+                    surfaced = result.get("sources", []) if isinstance(result, dict) else []
+                    vault_hits = len(surfaced)
+                    bp_analytics.record_recall(
+                        query=message, surfaced=surfaced,
+                        duration_ms=duration_ms, vault_hits=vault_hits,
+                        research_fired=research_result is not None,
+                    )
+                except Exception:
+                    pass
+
             self._send_json(result)
+
+            # v3: write-back extractor (fire-and-forget after response)
+            if "writeback" in _BP_V3_MODULES:
+                try:
+                    ai_response = json.dumps(result) if isinstance(result, dict) else str(result)
+                    bp_writeback.schedule_extract_async(message, ai_response)
+                except Exception:
+                    pass
+
         elif path == "/clear-cache":
             clear_session_cache()
             self._send_json({"status": "cleared"})
@@ -1717,10 +1810,25 @@ def serve():
     print(f"  semantic={'ON' if SEMANTIC_ENABLED else 'OFF'} graph=sqlite", file=sys.stderr)
 
     def graceful_exit(signum, frame):
+        # v3 §G4 — drain research executor cleanly so in-flight background
+        # research has a chance to finish before we kill the server.
+        if "research" in _BP_V3_MODULES:
+            try:
+                bp_research.shutdown(wait=True, timeout=5.0)
+            except Exception:
+                pass
         threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, graceful_exit)
     signal.signal(signal.SIGINT, graceful_exit)
+
+    # §G4 — atexit hook as last line of defense for research executor drain
+    if "research" in _BP_V3_MODULES:
+        import atexit
+        try:
+            atexit.register(bp_research.shutdown, wait=True, timeout=5.0)
+        except Exception:
+            pass
 
     # Start dream engine background loop
     if DREAM_ENABLED:

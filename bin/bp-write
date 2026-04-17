@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""bp-write — review / approve / reject write-back proposals.
+
+Subcommands:
+  review    Interactive walk through pending proposals (approve/reject/edit/skip)
+  list      Print pending proposals as JSON
+  purge     Expire all pending proposals older than N days
+"""
+from __future__ import annotations
+import os
+import sys
+import json
+
+# Allow running from install dir
+_SRC = os.path.expanduser("~/BrainPass/src")
+if os.path.isdir(_SRC) and _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+try:
+    from bp_writeback.queue import get_queue
+    from bp_writeback.extractor import _commit_to_vault
+except ImportError as e:
+    print(f"error: bp_writeback not importable: {e}", file=sys.stderr)
+    sys.exit(1)
+
+
+def cmd_list() -> int:
+    q = get_queue()
+    rows = q.list_pending(limit=200)
+    for r in rows:
+        print(json.dumps({
+            "id": r.proposal_id,
+            "type": r.proposal.type_,
+            "title": r.proposal.title,
+            "confidence": r.proposal.confidence,
+            "created_unix": r.proposal.created_unix,
+        }))
+    return 0
+
+
+def cmd_review() -> int:
+    q = get_queue()
+    rows = q.list_pending(limit=200)
+    if not rows:
+        print("no pending proposals")
+        return 0
+    approved = rejected = skipped = 0
+    for r in rows:
+        p = r.proposal
+        print(f"\n[id={r.proposal_id}] {p.type_}/{p.title}.md (confidence={p.confidence:.2f})")
+        print("─" * 60)
+        print(p.content)
+        print("─" * 60)
+        while True:
+            ans = input("[a]pprove  [r]eject  [s]kip  [q]uit > ").strip().lower()
+            if ans in ("a", "approve"):
+                try:
+                    _commit_to_vault(p)
+                except (PermissionError, OSError) as e:
+                    print(f"[error] cannot write to vault: {e}", file=sys.stderr)
+                    print("[hint]  check permissions on ~/BrainPass/vault/", file=sys.stderr)
+                    print("[hint]  proposal stays in queue for retry", file=sys.stderr)
+                    return 2
+                q.approve(r.proposal_id)
+                approved += 1
+                print("[ok] approved")
+                break
+            elif ans in ("r", "reject"):
+                q.reject(r.proposal_id)
+                rejected += 1
+                print("[ok] rejected")
+                break
+            elif ans in ("s", "skip"):
+                skipped += 1
+                break
+            elif ans in ("q", "quit"):
+                print(f"\nsession: {approved} approved, {rejected} rejected, {skipped} skipped")
+                return 0
+            else:
+                print("unknown command")
+    print(f"\ndone: {approved} approved, {rejected} rejected, {skipped} skipped")
+    return 0
+
+
+def cmd_purge(days: int) -> int:
+    q = get_queue()
+    n = q.expire_stale(days * 86400)
+    print(f"expired {n} stale proposals")
+    return 0
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: bp-write {review|list|purge [days]}", file=sys.stderr)
+        return 1
+    cmd = sys.argv[1]
+    if cmd == "review":
+        return cmd_review()
+    if cmd == "list":
+        return cmd_list()
+    if cmd == "purge":
+        days = int(sys.argv[2]) if len(sys.argv) > 2 else 14
+        return cmd_purge(days)
+    print(f"unknown subcommand: {cmd}", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""bp-analytics — quick usage report from the recall-log."""
+from __future__ import annotations
+import os
+import sys
+
+_SRC = os.path.expanduser("~/BrainPass/src")
+if os.path.isdir(_SRC) and _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+try:
+    from bp_analytics.aggregator import hot_notes, dead_notes, query_patterns
+except ImportError as e:
+    print(f"error: bp_analytics not importable: {e}", file=sys.stderr)
+    sys.exit(1)
+
+
+def main() -> int:
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "report"
+    if cmd == "hot":
+        days = int(sys.argv[2]) if len(sys.argv) > 2 else 30
+        for item in hot_notes(days=days, top=20):
+            print(f"{item['recall_count']:>4}  {item['path']}")
+        return 0
+    if cmd == "dead":
+        days = int(sys.argv[2]) if len(sys.argv) > 2 else 90
+        for path in dead_notes(days=days, top=50):
+            print(path)
+        return 0
+    if cmd == "patterns":
+        days = int(sys.argv[2]) if len(sys.argv) > 2 else 30
+        for item in query_patterns(days=days, top=20):
+            print(f"{item['occurrences']:>4}  {item['topic_word']}  ({item['fraction_of_queries']:.1%})")
+        return 0
+    if cmd == "report":
+        print("=== BrainPass Analytics (last 30d) ===\n")
+        print("-- hot notes (most retrieved) --")
+        for item in hot_notes(days=30, top=10):
+            print(f"  {item['recall_count']:>4}  {item['path']}")
+        print("\n-- dead notes (never retrieved in 90d) --")
+        for path in dead_notes(days=90, top=10):
+            print(f"  {path}")
+        print("\n-- top query topics --")
+        for item in query_patterns(days=30, top=10):
+            print(f"  {item['occurrences']:>4}  {item['topic_word']}")
+        return 0
+    print("usage: bp-analytics {report|hot|dead|patterns} [days]", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
