@@ -22,16 +22,30 @@ import fcntl
 import json
 import math
 import os
+import shutil
+import sqlite3
 import sys
 import time
 import re
 import signal
+import threading
 import urllib.request
 from dataclasses import dataclass
 from datetime import date as _date_cls, datetime
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs
+
+# Semantic search — optional dependency, graceful degradation
+try:
+    import chromadb
+    from chromadb.config import Settings as ChromaSettings
+    CHROMADB_AVAILABLE = True
+except Exception:
+    # Catches ImportError and any init-time Python exception.
+    # WARNING: Native segfaults (e.g., in onnxruntime) are OS signals,
+    # NOT Python exceptions — they will kill the process unconditionally.
+    CHROMADB_AVAILABLE = False
 
 
 # ─── CONFIGURATION ───────────────────────────────────────────────────
@@ -141,6 +155,15 @@ if CHUNK_MIN > CHUNK_SIZE or CHUNK_SIZE > CHUNK_MAX:
 _ACCESS_LOG_DIR = VAULT_PATH / ".brainpass"
 _ACCESS_LOG_FILE = _ACCESS_LOG_DIR / "access.json"
 
+# Semantic search
+SEMANTIC_ENABLED = CHROMADB_AVAILABLE and os.environ.get("SEMANTIC_ENABLED", "true").lower() == "true"
+CHROMADB_DIR = _ACCESS_LOG_DIR / "chromadb"
+SEMANTIC_TOP_K = _clamp_env("SEMANTIC_TOP_K", 10, 1, 50, int)
+RRF_K = _clamp_env("RRF_K", 60, 1, 1000, int)
+
+# Knowledge graph
+_GRAPH_DB_PATH = _ACCESS_LOG_DIR / "graph.db"
+
 
 # ─── STOPWORDS ──────────────────────────────────────────────────────
 _DEFAULT_STOPWORDS: frozenset = frozenset({
@@ -191,6 +214,17 @@ _TOKEN_RE = re.compile(r"[a-z0-9]+")
 def tokenize(text: str) -> list:
     """Lowercase, extract alphanumeric tokens, filter stopwords."""
     return [w for w in _TOKEN_RE.findall(text.lower()) if w not in STOPWORDS]
+
+
+def _sanitize_entity(name: str) -> str:
+    """Sanitize entity name: strip control chars, limit length, lowercase."""
+    name = re.sub(r'[\x00-\x1f\x7f]', '', name)
+    return name.strip().lower()[:100]
+
+
+def _escape_like(term: str) -> str:
+    """Escape LIKE wildcards in search terms."""
+    return term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
 # ─── FRONTMATTER PARSING ────────────────────────────────────────────
@@ -493,6 +527,21 @@ class ChunkIndex:
         self._built_at = time.time()
         self._doc_count = N
 
+        # Trigger background build for semantic + graph (non-blocking)
+        global _BUILD_THREAD
+        if _BUILD_LOCK.acquire(blocking=False):
+            try:
+                _BUILD_THREAD = threading.Thread(
+                    target=_background_build,
+                    args=(list(self._chunks), self.vault_path),
+                    daemon=True,
+                )
+                _BUILD_THREAD.start()
+            except Exception:
+                pass
+            finally:
+                _BUILD_LOCK.release()
+
     def search(self, query: str, max_results: int = 5) -> list:
         """BM25 search. Returns list of {"file", "score", "preview"}."""
         self._ensure_fresh()
@@ -591,6 +640,285 @@ class ChunkIndex:
 
 
 _INDEX = ChunkIndex(vault_path=VAULT_PATH, ttl=INDEX_TTL)
+
+
+# ─── SEMANTIC INDEX (ChromaDB) ──────────────────────────────────────
+class SemanticIndex:
+    """ChromaDB-backed semantic search over vault chunks. Fully fault-tolerant."""
+
+    def __init__(self, vault_path, chromadb_dir):
+        self.vault_path = vault_path
+        self.chromadb_dir = chromadb_dir
+        self._client = None
+        self._collection = None
+        self._built_at = 0.0
+        self._doc_count = 0
+        self._healthy = True
+        self._failure_count = 0
+        self._max_failures = 3
+
+    @property
+    def is_fresh(self):
+        return self._healthy and self._built_at > 0 and (time.time() - self._built_at) <= INDEX_TTL
+
+    def _ensure_client(self):
+        if self._client is not None:
+            return
+        try:
+            os.makedirs(str(self.chromadb_dir), mode=0o700, exist_ok=True)
+            self._client = chromadb.PersistentClient(
+                path=str(self.chromadb_dir),
+                settings=ChromaSettings(anonymized_telemetry=False),
+            )
+        except Exception as e:
+            print(f"[warn] ChromaDB init failed, semantic search disabled: {e}", file=sys.stderr)
+            self._healthy = False
+
+    def build(self, chunks: list):
+        """Rebuild semantic index. Any failure disables gracefully."""
+        if not SEMANTIC_ENABLED or not chunks:
+            return
+        if self._failure_count >= self._max_failures:
+            return
+        self._healthy = True
+        self._ensure_client()
+        if not self._healthy:
+            self._failure_count += 1
+            return
+        try:
+            try:
+                self._client.delete_collection("vault_chunks")
+            except Exception:
+                pass
+            self._collection = self._client.get_or_create_collection(
+                name="vault_chunks", metadata={"hnsw:space": "cosine"})
+            if self._collection.count() > 0:
+                self._client.delete_collection("vault_chunks")
+                self._collection = self._client.create_collection(
+                    name="vault_chunks", metadata={"hnsw:space": "cosine"})
+            batch_size = 100
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i + batch_size]
+                self._collection.add(
+                    ids=[f"{c.file_path}:{c.chunk_idx}" for c in batch],
+                    documents=[c.text for c in batch],
+                    metadatas=[{"file": c.file_path, "chunk_idx": c.chunk_idx} for c in batch])
+            self._doc_count = len(chunks)
+            self._built_at = time.time()
+            self._failure_count = 0
+        except Exception as e:
+            print(f"[warn] Semantic index build failed: {e}", file=sys.stderr)
+            self._failure_count += 1
+            self._collection = None
+            self._healthy = False
+            if self._failure_count >= 2:
+                try:
+                    shutil.rmtree(str(self.chromadb_dir), ignore_errors=True)
+                    self._client = None
+                except Exception:
+                    pass
+
+    def search(self, query: str, max_results: int = 10) -> list:
+        """Semantic search. Never raises. Returns [] on any failure."""
+        if not SEMANTIC_ENABLED or not self._healthy or self._collection is None:
+            return []
+        query = query.strip()[:2000]
+        if not query or len(query) < 2:
+            return []
+        try:
+            n = min(max_results, self._doc_count) if self._doc_count > 0 else max_results
+            results = self._collection.query(query_texts=[query], n_results=n)
+        except Exception as e:
+            print(f"[warn] Semantic search failed: {e}", file=sys.stderr)
+            return []
+        matches = []
+        if results and results.get("documents"):
+            docs = results["documents"][0]
+            metas = results["metadatas"][0]
+            distances = results["distances"][0] if results.get("distances") else [0.0] * len(docs)
+            for doc, meta, dist in zip(docs, metas, distances):
+                similarity = max(0.0, 1.0 - dist / 2.0)
+                preview = doc[:800] + "..." if len(doc) > 800 else doc
+                matches.append({"file": meta.get("file", ""), "score": round(similarity, 4), "preview": preview})
+        return matches
+
+
+# ─── KNOWLEDGE GRAPH (SQLite) ───────────────────────────────────────
+_WIKILINK_RE = re.compile(r'\[\[([^\]]+)\]\]')
+_BOLD_RE = re.compile(r'\*\*([^*]+)\*\*')
+_HEADER_RE = re.compile(r'^#+\s+(.+)$', re.MULTILINE)
+
+
+class KnowledgeGraph:
+    """Lightweight SQLite knowledge graph extracted from vault files."""
+
+    def __init__(self, db_path):
+        self.db_path = str(db_path)
+        self._conn = None
+        self._healthy = True
+
+    def _ensure_db(self):
+        if self._conn is not None:
+            return
+        try:
+            os.makedirs(os.path.dirname(self.db_path), mode=0o700, exist_ok=True)
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            try:
+                os.chmod(self.db_path, 0o600)
+            except Exception:
+                pass
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.executescript("""
+                CREATE TABLE IF NOT EXISTS entities (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL, type TEXT NOT NULL, source_file TEXT NOT NULL,
+                    UNIQUE(name, type, source_file));
+                CREATE TABLE IF NOT EXISTS triples (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subject TEXT NOT NULL, predicate TEXT NOT NULL, object TEXT NOT NULL,
+                    source_file TEXT NOT NULL, created_at REAL NOT NULL);
+                CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+                CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject);
+                CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object);
+            """)
+        except Exception as e:
+            print(f"[warn] Knowledge graph DB init failed: {e}", file=sys.stderr)
+            self._healthy = False
+
+    def rebuild_from_chunks(self, chunks, vault_path):
+        """Build graph from already-parsed chunks. No second vault scan."""
+        if not self._healthy or not vault_path.exists():
+            return
+        self._healthy = True
+        self._ensure_db()
+        if not self._healthy:
+            return
+        try:
+            self._conn.execute("DELETE FROM entities")
+            self._conn.execute("DELETE FROM triples")
+            self._conn.commit()
+            now = time.time()
+            file_contents = {}
+            for chunk in chunks:
+                if chunk.file_path not in file_contents:
+                    file_contents[chunk.file_path] = []
+                file_contents[chunk.file_path].append(chunk.text)
+            batch_count = 0
+            for rel_path, texts in file_contents.items():
+                combined = "\n\n".join(texts)
+                self._extract_entities(combined, rel_path, now)
+                batch_count += 1
+                if batch_count % 100 == 0:
+                    self._conn.commit()
+            self._conn.commit()
+        except Exception as e:
+            print(f"[warn] Knowledge graph rebuild failed: {e}", file=sys.stderr)
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+            self._healthy = False
+
+    def _extract_entities(self, content, rel_path, now):
+        """Extract entities from file content and create triples."""
+        if '\x00' in content[:512]:
+            return
+        entities_found = []
+        for match in _WIKILINK_RE.finditer(content):
+            name = _sanitize_entity(match.group(1))
+            if name and len(name) > 1:
+                entities_found.append((name, "wikilink"))
+                self._conn.execute("INSERT OR IGNORE INTO entities (name, type, source_file) VALUES (?, ?, ?)",
+                                   (name, "wikilink", rel_path))
+        for match in _HEADER_RE.finditer(content):
+            name = _sanitize_entity(match.group(1))
+            if name and len(name) > 2:
+                entities_found.append((name, "header"))
+                self._conn.execute("INSERT OR IGNORE INTO entities (name, type, source_file) VALUES (?, ?, ?)",
+                                   (name, "header", rel_path))
+        for match in _BOLD_RE.finditer(content):
+            name = _sanitize_entity(match.group(1))
+            if name and len(name) > 2 and len(name) < 60:
+                entities_found.append((name, "bold"))
+                self._conn.execute("INSERT OR IGNORE INTO entities (name, type, source_file) VALUES (?, ?, ?)",
+                                   (name, "bold", rel_path))
+        entities_found = entities_found[:50]
+        seen_pairs = set()
+        for i, (name_a, type_a) in enumerate(entities_found):
+            self._conn.execute(
+                "INSERT INTO triples (subject, predicate, object, source_file, created_at) VALUES (?, ?, ?, ?, ?)",
+                (name_a, "mentioned_in", rel_path, rel_path, now))
+            for j, (name_b, type_b) in enumerate(entities_found):
+                if i >= j or name_a == name_b:
+                    continue
+                pair = tuple(sorted([name_a, name_b]))
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+                self._conn.execute(
+                    "INSERT INTO triples (subject, predicate, object, source_file, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (name_a, "same_file", name_b, rel_path, now))
+
+    def query_related(self, terms: list, max_results: int = 10) -> list:
+        """Find files related to terms via graph. Never raises."""
+        if not self._healthy:
+            return []
+        self._ensure_db()
+        if not self._healthy or not terms:
+            return []
+        try:
+            file_scores = {}
+            for term in terms:
+                term_lower = _sanitize_entity(term)
+                if not term_lower or len(term_lower) < 2:
+                    continue
+                for row in self._conn.execute(
+                        "SELECT object FROM triples WHERE subject = ? AND predicate = 'mentioned_in'",
+                        (term_lower,)):
+                    file_scores[row[0]] = file_scores.get(row[0], 0.0) + 2.0
+                for row in self._conn.execute(
+                        "SELECT DISTINCT source_file FROM entities WHERE name LIKE ? ESCAPE '\\'",
+                        (f"%{_escape_like(term_lower)}%",)):
+                    file_scores[row[0]] = file_scores.get(row[0], 0.0) + 1.0
+                for row in self._conn.execute(
+                        """SELECT t2.object FROM triples t1
+                           JOIN triples t2 ON t1.object = t2.subject AND t2.predicate = 'mentioned_in'
+                           WHERE t1.subject = ? AND t1.predicate = 'same_file'""",
+                        (term_lower,)):
+                    file_scores[row[0]] = file_scores.get(row[0], 0.0) + 0.5
+            return [{"file": f, "score": round(s, 4), "reason": "graph"}
+                    for f, s in sorted(file_scores.items(), key=lambda x: x[1], reverse=True)[:max_results]]
+        except Exception as e:
+            print(f"[warn] Knowledge graph query failed: {e}", file=sys.stderr)
+            return []
+
+    def close(self):
+        if self._conn:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+
+
+# ─── MODULE INSTANCES + BACKGROUND BUILD ────────────────────────────
+_SEMANTIC_INDEX = SemanticIndex(vault_path=VAULT_PATH, chromadb_dir=CHROMADB_DIR) if SEMANTIC_ENABLED else None
+_KNOWLEDGE_GRAPH = KnowledgeGraph(_GRAPH_DB_PATH)
+
+_BUILD_LOCK = threading.Lock()
+_BUILD_THREAD = None
+
+
+def _background_build(chunks, vault_path):
+    """Build semantic index + knowledge graph in background thread."""
+    global _BUILD_THREAD
+    try:
+        if SEMANTIC_ENABLED and _SEMANTIC_INDEX:
+            _SEMANTIC_INDEX.build(chunks)
+        if _KNOWLEDGE_GRAPH:
+            _KNOWLEDGE_GRAPH.rebuild_from_chunks(chunks, vault_path)
+    finally:
+        _BUILD_THREAD = None
 
 
 # ─── IDENTITY LOADING ────────────────────────────────────────────────
@@ -830,7 +1158,7 @@ def recall(raw_message, topic_hint=""):
     stripped = raw_message.strip()
 
     if any(p.match(stripped) for p in _SKIP_PATTERNS) or len(stripped) < 10:
-        return {"result": "", "topic": topic, "skipped": True}
+        return {"result": "", "topic": topic, "skipped": True, "conflicts": "", "score_method": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked"}
 
     cache = load_session_cache()
 
@@ -899,7 +1227,8 @@ def recall(raw_message, topic_hint=""):
             "sources": cached_entry.get("files", []),
             "intent": intent,
             "confidence": "cached",
-            "score_method": "bm25-chunked",
+            "conflicts": "",
+            "score_method": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked",
         }
 
     # ═══ PHASE 2: DUAL SEARCH (BM25) ═════════════════════════════════
@@ -921,15 +1250,46 @@ def recall(raw_message, topic_hint=""):
             if rm.get("score", 0) >= 0.5:
                 all_matches.append(rm)
 
-    # Deduplicate by file
-    seen = set()
+    # ═══ HYBRID MERGE (Reciprocal Rank Fusion) ═══════════════════════
+    semantic_matches = []
+    if SEMANTIC_ENABLED and _SEMANTIC_INDEX and _SEMANTIC_INDEX.is_fresh:
+        semantic_query = " ".join(search_terms[:5]) if search_terms else raw_message[:200]
+        semantic_matches = _SEMANTIC_INDEX.search(semantic_query, max_results=SEMANTIC_TOP_K)
+
+    graph_matches = []
+    graph_terms = entities + search_terms[:3]
+    if _KNOWLEDGE_GRAPH and _KNOWLEDGE_GRAPH._healthy:
+        vault_resolved = VAULT_PATH.resolve()
+        for gr in _KNOWLEDGE_GRAPH.query_related(graph_terms, max_results=5):
+            file_path = (VAULT_PATH / gr["file"]).resolve()
+            if file_path.exists() and str(file_path).startswith(str(vault_resolved)):
+                try:
+                    content = file_path.read_text(errors="ignore")[:800]
+                    graph_matches.append({"file": gr["file"], "score": gr["score"], "preview": content})
+                except Exception:
+                    pass
+
+    file_scores = {}
+    def _rrf_add(matches):
+        sorted_m = sorted(matches, key=lambda x: x.get("score", 0), reverse=True)
+        for rank, m in enumerate(sorted_m):
+            key = m.get("file", "")
+            if not key:
+                continue
+            if key not in file_scores:
+                file_scores[key] = {"rrf": 0.0, "best_preview": m.get("preview", ""), "best_raw": m.get("score", 0)}
+            file_scores[key]["rrf"] += 1.0 / (RRF_K + rank)
+            if m.get("score", 0) > file_scores[key]["best_raw"]:
+                file_scores[key]["best_preview"] = m.get("preview", "")
+                file_scores[key]["best_raw"] = m.get("score", 0)
+
+    _rrf_add(all_matches)
+    _rrf_add(semantic_matches)
+    _rrf_add(graph_matches)
+
     unique_matches = []
-    for m in all_matches:
-        key = m.get("file", "")
-        if key not in seen:
-            seen.add(key)
-            unique_matches.append(m)
-    unique_matches.sort(key=lambda x: x.get("score", 0), reverse=True)
+    for key, data in sorted(file_scores.items(), key=lambda x: x[1]["rrf"], reverse=True):
+        unique_matches.append({"file": key, "score": round(data["rrf"], 6), "preview": data["best_preview"]})
 
     if not unique_matches:
         return {
@@ -938,7 +1298,8 @@ def recall(raw_message, topic_hint=""):
             "sources": [],
             "intent": intent,
             "confidence": "none",
-            "score_method": "bm25-chunked",
+            "conflicts": "",
+            "score_method": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked",
         }
 
     # Build context from top matches
@@ -964,11 +1325,14 @@ def recall(raw_message, topic_hint=""):
         f"1. Do these pages answer what was asked? Which are relevant, which are noise?\n"
         f"2. Is any information stale?\n"
         f"3. What's missing?\n"
-        f"4. Rate confidence: HIGH (direct match) / MEDIUM (probable) / LOW (reaching) / GUESS (barely related)\n\n"
+        f"4. Rate confidence: HIGH (direct match) / MEDIUM (probable) / LOW (reaching) / GUESS (barely related)\n"
+        f"5. CONFLICT CHECK: Do any sources CONTRADICT each other? Different dates, different values, "
+        f"different claims about the same thing? List each contradiction with the source files.\n\n"
         f"Output format (strict):\n"
         f"CONFIDENCE: [HIGH/MEDIUM/LOW/GUESS]\n"
         f"GAPS: [what's missing, or \"none\"]\n"
-        f"CONTEXT: [Your compiled answer — max 800 chars. Include [[source]] references. "
+        f"CONFLICTS: [list contradictions with sources, or \"none\"]\n"
+        f"CONTEXT: [Your compiled answer -- max 800 chars. Include [[source]] references. "
         f"If pages don't answer the question, say \"No relevant information found.\"]"
     )
 
@@ -982,6 +1346,7 @@ def recall(raw_message, topic_hint=""):
     context = ""
     confidence = "medium"
     gaps = ""
+    conflicts = ""
 
     if compile_response and not compile_response.startswith("{"):
         for line in compile_response.split('\n'):
@@ -990,8 +1355,12 @@ def recall(raw_message, topic_hint=""):
                 confidence = ls.split(':', 1)[1].strip().lower()
             elif ls.startswith('GAPS:'):
                 gaps = ls.split(':', 1)[1].strip()
+            elif ls.startswith('CONFLICTS:'):
+                conflicts = ls.split(':', 1)[1].strip()
 
-        context_match = re.search(r'CONTEXT:\s*(.*)', compile_response, re.DOTALL)
+        context_match = re.search(
+            r'CONTEXT:\s*(.*?)(?=\n(?:CONFIDENCE|GAPS|CONFLICTS):|$)',
+            compile_response, re.DOTALL)
         if context_match:
             context = context_match.group(1).strip()
             if context.lower() in ("none", "no relevant information found."):
@@ -999,7 +1368,7 @@ def recall(raw_message, topic_hint=""):
 
         if not context and "none" not in compile_response.lower()[:50]:
             lines = compile_response.split('\n')
-            content_lines = [l for l in lines if not l.strip().startswith(('CONFIDENCE:', 'GAPS:', 'TOPIC:'))]
+            content_lines = [l for l in lines if not l.strip().startswith(('CONFIDENCE:', 'GAPS:', 'TOPIC:', 'CONFLICTS:'))]
             fallback = '\n'.join(content_lines).strip()
             if len(fallback) > 30:
                 context = fallback[:800]
@@ -1028,7 +1397,8 @@ def recall(raw_message, topic_hint=""):
         "sources": source_names,
         "intent": intent,
         "confidence": confidence,
-        "score_method": "bm25-chunked",
+        "conflicts": conflicts if conflicts and conflicts.lower() != "none" else "",
+        "score_method": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked",
     }
 
 
@@ -1055,7 +1425,11 @@ class LibrarianHandler(BaseHTTPRequestHandler):
                 "chunks_indexed": _INDEX.doc_count,
                 "index_age_seconds": _INDEX.index_age,
                 "index_ttl": INDEX_TTL,
-                "search_engine": "bm25-chunked",
+                "search_engine": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked",
+                "semantic_enabled": SEMANTIC_ENABLED,
+                "semantic_docs": _SEMANTIC_INDEX._doc_count if _SEMANTIC_INDEX else 0,
+                "semantic_healthy": _SEMANTIC_INDEX._healthy if _SEMANTIC_INDEX else False,
+                "graph_healthy": _KNOWLEDGE_GRAPH._healthy if _KNOWLEDGE_GRAPH else False,
                 "bm25_k1": BM25_K1,
                 "bm25_b": BM25_B,
                 "chunk_size": CHUNK_SIZE,
@@ -1102,7 +1476,8 @@ def serve():
     server = HTTPServer(("127.0.0.1", SERVE_PORT), LibrarianHandler)
     print(f"BrainPass Librarian serving on 127.0.0.1:{SERVE_PORT}", file=sys.stderr)
     print(f"  provider={LLM_PROVIDER} model={LLM_MODEL} keys={len(API_KEYS)}", file=sys.stderr)
-    print(f"  search=bm25-chunked k1={BM25_K1} b={BM25_B} chunk={CHUNK_SIZE}", file=sys.stderr)
+    print(f"  search={'hybrid-rrf' if SEMANTIC_ENABLED else 'bm25-chunked'} k1={BM25_K1} b={BM25_B} chunk={CHUNK_SIZE}", file=sys.stderr)
+    print(f"  semantic={'ON' if SEMANTIC_ENABLED else 'OFF'} graph=sqlite", file=sys.stderr)
 
     def graceful_exit(signum, frame):
         threading.Thread(target=server.shutdown, daemon=True).start()
@@ -1113,6 +1488,7 @@ def serve():
         server.serve_forever()
     finally:
         server.server_close()
+        _KNOWLEDGE_GRAPH.close()
 
 
 if __name__ == "__main__":
@@ -1132,7 +1508,9 @@ if __name__ == "__main__":
             "provider": LLM_PROVIDER,
             "model": LLM_MODEL,
             "keys": len(API_KEYS),
-            "search_engine": "bm25-chunked",
+            "search_engine": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked",
+            "semantic_enabled": SEMANTIC_ENABLED,
+            "graph_healthy": _KNOWLEDGE_GRAPH._healthy,
             "chunks": _INDEX.doc_count,
         }, indent=2))
     else:

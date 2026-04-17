@@ -39,23 +39,30 @@ mkdir -p "$INSTALL_DIR"
 mkdir -p "$HOME/.config/systemd/user"
 
 # ─── Copy source (always, so upgrades work) ──────────────────────────
-echo "[..] copying src/"
-rm -rf "$INSTALL_DIR/src"
-cp -r "$REPO_ROOT/src" "$INSTALL_DIR/src"
+if [ "$REPO_ROOT" != "$INSTALL_DIR" ]; then
+    echo "[..] copying src/"
+    rm -rf "$INSTALL_DIR/src"
+    cp -r "$REPO_ROOT/src" "$INSTALL_DIR/src"
+else
+    echo "[ok] src/ already in place (repo == install dir)"
+fi
 chmod +x "$INSTALL_DIR/src/librarian.py"
 
-if [ -d "$REPO_ROOT/docs" ]; then
-    echo "[..] copying docs/"
-    rm -rf "$INSTALL_DIR/docs"
-    cp -r "$REPO_ROOT/docs" "$INSTALL_DIR/docs"
-fi
+if [ "$REPO_ROOT" != "$INSTALL_DIR" ]; then
+    if [ -d "$REPO_ROOT/docs" ]; then
+        echo "[..] copying docs/"
+        rm -rf "$INSTALL_DIR/docs"
+        cp -r "$REPO_ROOT/docs" "$INSTALL_DIR/docs"
+    fi
 
-# ─── Copy hooks (auto-inject hook for the user's AI tool) ────────────
-if [ -d "$REPO_ROOT/hooks" ]; then
-    echo "[..] copying hooks/"
-    rm -rf "$INSTALL_DIR/hooks"
-    cp -r "$REPO_ROOT/hooks" "$INSTALL_DIR/hooks"
-    chmod +x "$INSTALL_DIR/hooks/"*.sh 2>/dev/null || true
+    if [ -d "$REPO_ROOT/hooks" ]; then
+        echo "[..] copying hooks/"
+        rm -rf "$INSTALL_DIR/hooks"
+        cp -r "$REPO_ROOT/hooks" "$INSTALL_DIR/hooks"
+        chmod +x "$INSTALL_DIR/hooks/"*.sh 2>/dev/null || true
+    fi
+else
+    echo "[ok] docs/ and hooks/ already in place (repo == install dir)"
 fi
 
 # ─── Copy config (preserve user edits) ───────────────────────────────
@@ -64,10 +71,11 @@ if [ ! -d "$INSTALL_DIR/config" ]; then
     cp -r "$REPO_ROOT/config" "$INSTALL_DIR/config"
 else
     echo "[ok] config/ already present — keeping your edits"
-    # Always sync the .example/.template files so new users of this install get updates
-    cp "$REPO_ROOT/config/.env.example" "$INSTALL_DIR/config/.env.example"
-    cp "$REPO_ROOT/config/identity/SOUL.md.template" "$INSTALL_DIR/config/identity/SOUL.md.template"
-    cp "$REPO_ROOT/config/identity/MEMORY.md.template" "$INSTALL_DIR/config/identity/MEMORY.md.template"
+    if [ "$REPO_ROOT" != "$INSTALL_DIR" ]; then
+        cp "$REPO_ROOT/config/.env.example" "$INSTALL_DIR/config/.env.example"
+        cp "$REPO_ROOT/config/identity/SOUL.md.template" "$INSTALL_DIR/config/identity/SOUL.md.template"
+        cp "$REPO_ROOT/config/identity/MEMORY.md.template" "$INSTALL_DIR/config/identity/MEMORY.md.template"
+    fi
 fi
 
 # ─── Live .env from template ─────────────────────────────────────────

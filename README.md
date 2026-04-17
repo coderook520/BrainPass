@@ -21,6 +21,7 @@
 
 <br>
 
+<img src="https://img.shields.io/badge/v2.0-hybrid_search-EC4899?style=flat-square&labelColor=1E1B4B">
 <img src="https://img.shields.io/badge/ships-today-EC4899?style=flat-square&labelColor=1E1B4B">
 <img src="https://img.shields.io/badge/setup-10_minutes-8B5CF6?style=flat-square&labelColor=1E1B4B">
 <img src="https://img.shields.io/badge/runs_on-your_laptop-6366F1?style=flat-square&labelColor=1E1B4B">
@@ -133,7 +134,23 @@ you ← "wireframes — mobile breakpoint still open. Sarah needs
        them Friday EOD per projects/johnson.md."
 ```
 
-That's it. No vector DB. No LangChain. No $20/month SaaS middleman. Just a librarian, a stack of notes, and a ~100-line shell hook that fires on every message so your AI never has to remember to check.
+That's it. No LangChain. No $20/month SaaS middleman. Just a librarian, a stack of notes, and a ~100-line shell hook that fires on every message so your AI never has to remember to check.
+
+### v2.0 — triple-engine search
+
+BrainPass v2 doesn't just keyword search your notes. It runs **three search engines in parallel** and merges the results:
+
+| engine | what it does | how it works |
+|---|---|---|
+| **BM25** | keyword search | classic text matching — fast, reliable, always on |
+| **Semantic** *(optional)* | meaning search | ChromaDB + vector embeddings — finds notes that mean the same thing even with different words |
+| **Knowledge Graph** | entity search | SQLite graph of every person, project, and concept in your vault — finds related notes through connections, not keywords |
+
+Results are combined using **Reciprocal Rank Fusion (RRF)** — the same merge algorithm Google uses. A note that shows up in all three engines ranks higher than one that only matches keywords.
+
+**Plus: conflict detection.** When your notes contradict each other (different dates, different claims), BrainPass flags it instead of silently picking one.
+
+The semantic engine is **optional** — install `chromadb` to enable it, or don't. BM25 + knowledge graph work with zero pip dependencies. Everything degrades gracefully.
 
 ### what makes it automatic
 
@@ -158,7 +175,7 @@ If your tool doesn't support pre-hooks (most web UIs), there's a fallback: paste
 |---|---|---|
 | **Obsidian** | free markdown notebook | your notes, your disk, your links |
 | **NotebookLM** *(optional)* | Google's smart search | free tier, lazy setup, good recall |
-| **Librarian** | ~300 lines of Python | the thing that actually does the work |
+| **Librarian** | ~1500 lines of Python | BM25 + semantic + knowledge graph + conflict detection |
 | **Your LLM** | Claude / GPT / Kimi / Llama / whatever | swap it anytime, notes don't care |
 
 Boring tech on purpose. Every part of this stack has been stable for years. No bleeding edge. No "wait for v2". It runs today, on your laptop, with whatever you already have.
@@ -348,9 +365,11 @@ If you can read the files in `~/BrainPass/`, you can audit every byte your AI ha
 ┌─────────────────────────────────────────┐
 │        BrainPass Librarian              │
 │      (Python HTTP on :7778)             │
-│  • parses query                         │
-│  • searches vault (keyword / FTS5)      │
-│  • returns ranked note snippets         │
+│  • BM25 keyword search                  │
+│  • ChromaDB semantic search (optional)  │
+│  • SQLite knowledge graph               │
+│  • RRF merge + conflict detection       │
+│  • returns ranked, cited note snippets  │
 └──────────────────┬──────────────────────┘
                    │
                    ▼
@@ -362,7 +381,7 @@ If you can read the files in `~/BrainPass/`, you can audit every byte your AI ha
 └─────────────────────────────────────────┘
 ```
 
-The whole thing is ~300 lines of Python. No magic. Just good plumbing.
+~1500 lines of Python. Three search engines. Zero SaaS dependencies. Just good plumbing.
 
 ---
 
@@ -387,6 +406,6 @@ The whole thing is ~300 lines of Python. No magic. Just good plumbing.
 
 <br><br>
 
-*boring tech on purpose. no LangChain, no vector DB rituals, no SaaS tax. just notes and a librarian.*
+*boring tech on purpose. no LangChain, no SaaS tax. three search engines that run on your laptop. just notes and a librarian.*
 
 </div>

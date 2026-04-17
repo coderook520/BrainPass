@@ -1,12 +1,15 @@
 # BrainPass — dependencies
 #
-# The librarian uses Python standard library only:
-#   http.server, urllib.request, json, pathlib, re, signal
+# Core librarian uses Python standard library + sqlite3 (stdlib).
+# BM25 search works with zero pip dependencies.
 #
-# No pip install required. This file exists so tooling that expects a
-# requirements.txt doesn't get confused.
+# Optional: semantic search (ChromaDB) — enables hybrid BM25+vector search
+# Install with: pip install chromadb importlib-metadata
 #
-# If you want to extend BrainPass with optional niceties, add them below:
+chromadb>=1.0.0
+importlib-metadata        # Python 3.14 compat for opentelemetry
+#
+# Other optional niceties:
 #   requests        — if you prefer it over urllib
 #   rich            — for pretty CLI output
 #   watchdog        — for live vault reindexing
