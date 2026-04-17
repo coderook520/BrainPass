@@ -1,5 +1,9 @@
 <div align="center">
 
+# 🧠 Easiest install. Just hand it to your AI and watch him take care of the rest.
+
+<br>
+
 <img src="https://img.shields.io/badge/BrainPass-8B5CF6?style=for-the-badge&logo=obsidian&logoColor=white&labelColor=1E1B4B" alt="BrainPass" height="44">
 
 ### your AI finally remembers shit.
@@ -8,7 +12,11 @@
 
 <br>
 
-<img src="https://img.shields.io/badge/works_with-any_AI-10B981?style=for-the-badge&labelColor=1E1B4B">
+<img src="https://img.shields.io/badge/v3-self--feeding_brain-EC4899?style=for-the-badge&labelColor=1E1B4B">
+<img src="https://img.shields.io/badge/88_tests-passing-10B981?style=for-the-badge&labelColor=1E1B4B">
+<img src="https://img.shields.io/badge/auth--gated-default_ON-F59E0B?style=for-the-badge&labelColor=1E1B4B">
+
+<br><br>
 
 <img src="https://img.shields.io/badge/Claude-CC785C?style=flat-square&logo=anthropic&logoColor=white">
 <img src="https://img.shields.io/badge/GPT-412991?style=flat-square&logo=openai&logoColor=white">
@@ -19,185 +27,124 @@
 <img src="https://img.shields.io/badge/LM_Studio-6C47FF?style=flat-square">
 <img src="https://img.shields.io/badge/any_OpenAI--compatible-gray?style=flat-square">
 
-<br>
-
-<img src="https://img.shields.io/badge/v2.1-5_engine_brain-EC4899?style=flat-square&labelColor=1E1B4B">
-<img src="https://img.shields.io/badge/ships-today-EC4899?style=flat-square&labelColor=1E1B4B">
-<img src="https://img.shields.io/badge/setup-10_minutes-8B5CF6?style=flat-square&labelColor=1E1B4B">
-<img src="https://img.shields.io/badge/runs_on-your_laptop-6366F1?style=flat-square&labelColor=1E1B4B">
-<img src="https://img.shields.io/badge/cost-$0_to_start-3B82F6?style=flat-square&labelColor=1E1B4B">
-<img src="https://img.shields.io/badge/python-3.10+-1E40AF?style=flat-square&labelColor=1E1B4B">
-<img src="https://img.shields.io/badge/license-MIT-0EA5E9?style=flat-square&labelColor=1E1B4B">
-
 </div>
 
 ---
 
-## what BrainPass actually is
+## TL;DR
 
-Short version: your AI is a goldfish. BrainPass is the assistant standing next to the goldfish, handing it a briefing packet 50 milliseconds before it opens its mouth.
+> Your AI is a **goldfish**. Every new chat it forgets you exist. BrainPass is the librarian who hands it a briefing packet 50ms before it opens its mouth.
+>
+> - **Your notes live on your disk.** Plain markdown in `~/BrainPass/vault/`. No cloud. No vendor lock-in.
+> - **Any AI, anytime.** Swap Claude for GPT for Llama without losing your notes.
+> - **Fires automatically.** A hook runs on every message so your AI never forgets to check.
+> - **5 search engines + 4 self-feeding features.** It doesn't just *read* your vault — it *grows* it while you use it.
+> - **Gated by default.** Only answers when an AI CLI is actively running under your user. Cron jobs, test loops, supply-chain surprises → `403`. Your API key stops bleeding when you walk away.
+> - **Installs in 10 minutes.** Free with Groq. Works offline with Ollama. `~/BrainPass` is yours.
 
-### the goldfish thing
+```bash
+git clone https://github.com/coderook520/BrainPass.git && cd BrainPass && ./install.sh
+```
 
-Every LLM — Claude, GPT, Kimi, Llama, whoever — resets to zero the second you close the tab. No persistence. You could spend three hours explaining your business, walk away, come back, and it's a stranger.
+---
 
-You can't fix that. No amount of prompting teaches a stateless model to "remember." The weights are frozen. The context window is finite and expensive. Anyone selling you "AI memory" is selling you a summary their backend compresses your life into.
+## the goldfish problem
 
-What you *can* fix is making the goldfish's forgetting **irrelevant**.
+Every LLM — Claude, GPT, Kimi, Llama — resets to zero the second you close the tab. You could spend three hours explaining your business, walk away, come back, and it's a stranger.
+
+You can't fix that. Weights are frozen. Context windows are finite. Anyone selling you "AI memory" is selling you a compressed summary on their servers.
+
+What you *can* fix is making the forgetting **irrelevant**.
 
 ### Marcus and Sarah
 
-Picture a boardroom. Marcus is brilliant. Solves anything you throw at him. But he has no memory — if you pause for breath, he forgets who you are, what company you run, what you were just saying.
+Picture a boardroom. Marcus is brilliant but has no memory — if you pause for breath, he forgets who you are.
 
-Without help, every conversation is:
+Put **Sarah** next to him. Three superpowers:
 
-> **you:** "About the Johnson wireframes..."
-> **Marcus:** "Who's Johnson? What project? Sorry, no context."
-
-You paste the same brief. Re-introduce the same people. Re-explain the same decisions. Groundhog Day with a genius.
-
-Now put **Sarah** next to him. Three superpowers:
-
-1. Access to the filing cabinet in the corner of the room (your Obsidian vault)
-2. She can scan 10,000 documents in 50 milliseconds
+1. Access to the filing cabinet in the corner (your Obsidian vault)
+2. She reads 10,000 documents in 50 milliseconds
 3. She doesn't wait to be asked
 
-You start talking. Sarah dashes to the cabinet, pulls the Johnson folder, grabs Tuesday's meeting notes, snags yesterday's Slack thread, slaps a briefing on Marcus's desk before he opens his mouth.
+You start talking. Sarah dashes to the cabinet, pulls the Johnson folder, grabs Tuesday's notes, snags yesterday's Slack thread, slaps a briefing on Marcus's desk before he opens his mouth.
 
-> **Marcus** *(flipping the packet):* "Right — you're 80% done on the mobile breakpoint, Sarah Chen needs it Friday EOD, she prefers Slack, and she sounded stressed in your Tuesday call. Want me to unstick the nav component?"
+> **Marcus:** *(flipping the packet)* "Right — you're 80% done on mobile breakpoint, Sarah Chen needs it Friday EOD, she prefers Slack, and she sounded stressed Tuesday. Want me to unstick the nav?"
 
 Marcus didn't remember anything. He's still a goldfish. But Sarah fed him every detail 0.05 seconds before he needed it, and from your side it feels like talking to someone who's been in every meeting.
 
 **That's BrainPass.**
 
-- **You** are the person in the room.
-- **Marcus** is whatever LLM you're pointed at (swap anytime).
-- **Sarah** is the librarian running on `127.0.0.1:7778`.
-- **The filing cabinet** is your Obsidian vault — markdown files on your disk.
-
-### why this beats "AI memory" features
-
-ChatGPT and friends sell "memory" that's a compressed summary sitting on their servers. It loses nuance. You can't audit it. You can't edit it. If they change the policy tomorrow it's gone.
-
-BrainPass doesn't summarize. It *retrieves*. The full note. The exact thread. The complete spec. Fresh, every time.
-
-You own the cabinet. You switch AIs whenever. You delete anything. You audit every byte your AI has access to. It's your disk.
-
-**10 minutes** to install. **$0** if you use Groq's free tier. Works with Claude, GPT, Kimi, Llama, or local models — swap anytime.
-
-<p align="center"><code>notes + search + your LLM = memory that survives</code></p>
+- **You** are the person in the room
+- **Marcus** is whatever LLM you're pointed at (swap anytime)
+- **Sarah** is the librarian running on `127.0.0.1:7778`
+- **The filing cabinet** is your Obsidian vault — markdown files on your disk
 
 ---
 
-## easiest install — hand it to your AI
-
-You don't have to read this README. Clone the repo, open the folder in whatever AI coding tool you use — Claude Code, Cursor, Warp, Windsurf, Aider, Continue, whatever — and say:
-
-> **"Read `SETUP-WITH-YOUR-AI.md` and set this up for me."**
-
-Your AI will read the runbook, walk you through a 10-minute conversation, ask which LLM you want running behind the librarian (it'll recommend Groq's free tier), grab an API key from you, run the installer, start the service, wire itself into BrainPass, write your first note with you, and prove recall works. You answer like five questions total and hit enter.
-
-If you'd rather install it manually — or you don't have an AI tool to hand the repo to — the rest of this README is the human version.
-
----
-
-## how it actually works
-
-You write notes in Obsidian (or literally any text editor — it's just markdown). A tiny Python service sits on `localhost:7778` and waits. When your AI has a question about you, it hits that service. The service searches your notes, grabs what's relevant, stuffs it into your LLM with your question, and hands back the answer. With citations.
+## how it works
 
 ```
 you → "what am I supposed to finish by Friday?"
        │
-       ▼
-(UserPromptSubmit hook fires automatically — before your AI sees the message)
-       │
-       ▼
+       ▼  (UserPromptSubmit hook fires BEFORE your AI sees the message)
 brainpass-inject.sh → POST localhost:7778/recall
                             │
                             ▼
        BrainPass searches ~/BrainPass/vault/ in ~50ms
+       (5 engines in parallel: BM25 + semantic + graph + dreams + predictions)
                             │
                             ▼
        finds: projects/johnson.md, daily/2026-04-12.md
                             │
                             ▼
-       feeds them to the librarian's runner LLM with your question
+       compiles a cited briefing with your runner LLM
                             │
                             ▼
-       compiles a cited briefing and injects it into the conversation
-                            │
-                            ▼
-your AI ← sees your message + BrainPass briefing, reads both, answers
-              │
-              ▼
-you ← "wireframes — mobile breakpoint still open. Sarah needs
-       them Friday EOD per projects/johnson.md."
+your AI ← sees your message + the briefing, reads both, answers
 ```
 
-That's it. No LangChain. No $20/month SaaS middleman. Just a librarian, a stack of notes, and a ~100-line shell hook that fires on every message so your AI never has to remember to check.
-
-### v2.1 — five-engine brain
-
-BrainPass doesn't just keyword search your notes. It runs **five engines** that work together:
-
-| # | engine | what it does | how it works |
-|---|---|---|---|
-| 1 | **BM25** | keyword search | classic text matching — fast, reliable, always on, zero dependencies |
-| 2 | **Semantic** *(optional)* | meaning search | ChromaDB + vector embeddings — finds notes that *mean* the same thing even with completely different words |
-| 3 | **Knowledge Graph** | entity search | SQLite graph of every person, project, and concept in your vault — finds related notes through connections, not keywords |
-| 4 | **Dream Engine** | creative insights | generates speculative connections between unrelated notes while idle — sandboxed in `.dreams/`, never contaminates real data |
-| 5 | **Predictive Pre-fetch** | anticipation | learns what you ask about next using Markov chains — pre-fetches bonus context before you even type |
-
-Search results from engines 1-3 are combined using **Reciprocal Rank Fusion (RRF)** — the same merge algorithm Google uses. A note that shows up in all three engines ranks higher than one that only matches keywords.
-
-**Conflict detection** — when your notes contradict each other (different dates, different claims about the same thing), BrainPass flags it instead of silently picking one.
-
-**Dream Engine** — while the librarian is idle, it picks random entities from your knowledge graph, asks the LLM to find non-obvious connections, and saves them to `vault/.dreams/`. Dreams are **completely sandboxed** — main search never sees them. Browse them with `GET /dreams` when you want inspiration. If a dream turns out to be a real insight, move it to the real vault yourself.
-
-**Predictive Pre-fetch** — tracks topic transitions (after asking about X, you usually ask about Y). After a few queries, it starts pre-fetching the predicted next topic and appends it as bonus context. Gets smarter every query. No training step. Just a JSON file counting transitions.
-
-Everything is **optional and graceful**:
-- No chromadb? BM25 + knowledge graph + dreams + predictions still work.
-- No API key? BM25 keyword search still works standalone.
-- Turn off dreams? Set `DREAM_ENABLED=false` in `.env`.
-- Nothing ever crashes the service. Every engine fails independently.
-
-### what makes it automatic
-
-The piece that turns BrainPass from *"AI has to remember to call /recall"* into *"AI just always knows"* is a `UserPromptSubmit` hook at `~/BrainPass/hooks/brainpass-inject.sh`. You register it once with your AI tool (Claude Code's `settings.json`, Warp's pre-prompt script, etc.) and from then on every single message you send fires it first — it grabs your prompt, hits the librarian, gets the compiled notes back, and drops them into the conversation *before* your AI sees your message. Your AI doesn't have to know BrainPass exists. It just reads a conversation that already has the right context in it.
-
-If your tool doesn't support pre-hooks (most web UIs), there's a fallback: paste a "always check BrainPass first" instruction into your system prompt. Works, but you're trusting the model to actually do it. The hook is the real wire.
+No LangChain. No $20/month SaaS middleman. Just a librarian, a stack of notes, and a ~100-line shell hook that fires on every message so your AI never has to remember to check.
 
 ---
 
-## the stack
+## what's in the box
 
-<div align="center">
+### 5 search engines (v2.1)
 
-<img src="https://img.shields.io/badge/Obsidian-8B5CF6?style=flat-square&logo=obsidian&logoColor=white">
-<img src="https://img.shields.io/badge/ChromaDB-FF6F61?style=flat-square">
-<img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white">
-<img src="https://img.shields.io/badge/Python_3.10+-3B82F6?style=flat-square&logo=python&logoColor=white">
-<img src="https://img.shields.io/badge/Your_LLM-EC4899?style=flat-square">
-
-</div>
-
-| piece | what it is | why |
+| # | engine | what it does |
 |---|---|---|
-| **Obsidian** | free markdown notebook | your notes, your disk, your links |
-| **ChromaDB** *(optional)* | vector embedding database | semantic search — finds notes by meaning, not just keywords |
-| **SQLite** | embedded graph database | knowledge graph — maps every entity and relationship in your vault |
-| **Librarian** | ~1700 lines of Python | 5 engines: BM25 + semantic + graph + dreams + predictions |
-| **Your LLM** | Claude / GPT / Kimi / Llama / whatever | swap it anytime, notes don't care |
-| **NotebookLM** *(optional)* | Google's smart search | free tier, lazy setup, good recall |
+| 1 | **BM25** | classic keyword — fast, zero deps, always on |
+| 2 | **Semantic** *(optional)* | ChromaDB vectors — finds notes that *mean* the same thing |
+| 3 | **Knowledge Graph** | SQLite graph of people/projects/concepts |
+| 4 | **Dream Engine** | speculative connections generated while idle (sandboxed in `.dreams/`) |
+| 5 | **Predictive Pre-fetch** | Markov chain learns what you ask next, fetches it before you type |
 
-Boring tech on purpose. Stable libraries. Runs on your laptop. No cloud required.
+Results from 1-3 merge via **Reciprocal Rank Fusion** (same algorithm Google uses). A note hit by all three ranks higher than one hit by keywords alone.
+
+**Conflict detection.** When your notes contradict each other (different dates, different claims), BrainPass flags it instead of silently picking one.
+
+### 4 self-feeding features (v3, all default on)
+
+| feature | what it does |
+|---|---|
+| **Write-back** | Your AI's responses get parsed for save-worthy facts. Proposals queue up. `bp-write review` walks them with one-tap approve. Vault grows without you typing notes. |
+| **Temporal awareness** | Recent notes outrank old ones (30-day exp decay). `/changed?since=<iso>` surfaces what moved this week. `/timeline?topic=X` shows cross-time fact evolution — catches "you said Rust 6 months ago, Go last Tuesday." |
+| **Self-teaching vault** | Every recall logs (scrubbed) which notes were surfaced. `bp-analytics report` shows **hot notes** (retrieved constantly) and **dead notes** (never touched in 90d). The vault improves from being used. |
+| **Auto-research** | When your vault has nothing on a topic (< 2 hits), the librarian fetches Wikipedia + arXiv + DuckDuckGo, synthesizes with your LLM, and queues the findings via write-back. **Solves the cold-start problem.** Next time you ask, it's already in your vault. |
+
+The loop: empty vault → ask → auto-research → approve → next time you ask, zero research cost. Your vault grows on **revealed preference** — topics you actually care about.
+
+### why this beats "AI memory" features
+
+ChatGPT and friends sell "memory" that's a compressed summary on their servers. Loses nuance. Can't audit. Can't edit. Policy change tomorrow, it's gone.
+
+BrainPass doesn't summarize — it **retrieves**. The full note. The exact thread. The complete spec. Fresh, every time.
+
+You own the cabinet. You switch AIs whenever. You delete anything. You audit every byte. It's your disk.
 
 ---
 
-## install
-
-### 1. clone & run the installer
+## 10-minute install
 
 ```bash
 git clone https://github.com/coderook520/BrainPass.git
@@ -205,11 +152,11 @@ cd BrainPass
 ./install.sh
 ```
 
-You now have `~/BrainPass/` with a vault, a config folder, a systemd service, and a fresh `.env` template.
+You now have `~/BrainPass/` with a vault, config folder, systemd service, and a gate daemon auto-enabled.
 
-### 2. drop in an API key
+### 1. drop in an API key
 
-Open `~/BrainPass/config/.env` and pick one provider. Groq has a free tier and is fastest to get going:
+Edit `~/BrainPass/config/.env`. **Groq has a free tier and is fastest:**
 
 ```bash
 LLM_PROVIDER=groq
@@ -217,15 +164,14 @@ LLM_MODEL=openai/gpt-oss-120b
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxx
 ```
 
-Or swap in `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / point at your local Ollama — same file.
+Or swap in `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / point at local Ollama — same file.
 
-### 3. give your agent a personality
+### 2. give your agent a personality
 
-Open `~/BrainPass/config/identity/SOUL.md`. This is the forever-system-prompt your AI will read on every call. Make it yours:
+Edit `~/BrainPass/config/identity/SOUL.md`:
 
 ```markdown
 # my agent
-
 You're my personal assistant. Speak casually. Check my notes
 before answering anything about me or my projects. Cite sources.
 If you don't find the answer in the notes, say so — don't guess.
@@ -234,14 +180,13 @@ If you don't find the answer in the notes, say so — don't guess.
 - building a rust CLI called ripfire
 - I hate long explanations unless I ask
 - timezone: America/Chicago
-- call me by my first name
 ```
 
-### 4. open the vault in Obsidian
+### 3. open the vault in Obsidian
 
-Launch Obsidian → **Open folder as vault** → pick `~/BrainPass/vault/`. You'll see `daily/`, `projects/`, `people/`, `topics/`, `sources/`. Make a note in any of them. Save.
+**Open folder as vault** → pick `~/BrainPass/vault/`. You'll see `daily/`, `projects/`, `people/`, `topics/`, `sources/`. Make a note in any of them. Save.
 
-### 5. start the librarian
+### 4. start it
 
 ```bash
 systemctl --user start brainpass-librarian
@@ -249,19 +194,17 @@ systemctl --user enable brainpass-librarian
 curl http://127.0.0.1:7778/status
 ```
 
-Should come back `{"status": "ok", ...}`. Done. The librarian is alive.
+Should come back `{"status": "ok", ...}`. Done.
 
----
-
-## the one step everyone skips
+### 5. the one step everyone skips
 
 > [!IMPORTANT]
-> **If you skip this step, BrainPass does nothing.** Installing it isn't enough. Your LLM has no idea the librarian exists until you tell it. This is the #1 reason people think BrainPass is broken.
+> **If you skip this step, BrainPass does nothing.** Your LLM has no idea the librarian exists until you tell it.
 
-Paste this block into your AI's system prompt / custom instructions / `CLAUDE.md` / whatever the personality slot is called in the tool you're using:
+Paste this into your AI's system prompt / custom instructions / `CLAUDE.md`:
 
 ```
-You have access to a memory system called BrainPass running at
+You have access to a memory system called BrainPass at
 http://127.0.0.1:7778. It contains my notes, preferences, projects,
 and past conversations as markdown files.
 
@@ -273,22 +216,19 @@ anything we've discussed before, you MUST query BrainPass first:
 
 Read the returned notes and answer using them as source of truth.
 Always cite which file(s) you pulled from. If BrainPass returns
-nothing relevant, say "I checked your notes and didn't find anything
-about that." Never make up answers.
-
-When I tell you something worth remembering, suggest which file it
-should land in (daily/, projects/, people/, topics/).
+nothing relevant, say "I checked your notes and didn't find anything."
+Never make up answers.
 ```
 
-### where to paste it
-
-| tool | where |
+| tool | where to paste |
 |---|---|
-| **Claude Code** | `CLAUDE.md` at your repo root, or `~/.claude/CLAUDE.md` globally |
+| **Claude Code** | `CLAUDE.md` at repo root, or `~/.claude/CLAUDE.md` globally |
 | **Claude Desktop** | Settings → Project Instructions |
-| **ChatGPT** | Settings → Custom Instructions → "How should ChatGPT respond?" |
-| **Ollama / Open WebUI** | System Prompt field in chat settings |
-| **LangChain / AutoGen / CrewAI** | System message + register `/recall` as a tool |
+| **ChatGPT** | Settings → Custom Instructions |
+| **Cursor / Windsurf / Aider** | `.cursorrules` / system prompt |
+| **Ollama / Open WebUI** | System Prompt field |
+
+For Claude Code / Cursor / etc. that support hooks, the `hooks/brainpass-inject.sh` hook fires **automatically** on every message. No system prompt trust required.
 
 ---
 
@@ -296,13 +236,13 @@ should land in (daily/, projects/, people/, topics/).
 
 BrainPass is only as smart as what you feed it. Five rules:
 
-1. **one idea per file** — `projects/ripfire-cli.md`, not `projects.md`
-2. **name files like you'd search** — future you types "sarah", future you wants `people/sarah.md` to exist
-3. **date your daily notes** — `daily/2026-04-15.md`. Non-negotiable.
-4. **link aggressively** — `[[ripfire-cli]]` in a daily note. Obsidian builds the graph for free.
-5. **write short** — your LLM is not your therapist. Facts. Dates. Names. Done.
+1. **One idea per file.** `projects/ripfire-cli.md`, not `projects.md`.
+2. **Name files like you'd search.** Future you types "sarah" → `people/sarah.md` better exist.
+3. **Date daily notes.** `daily/2026-04-15.md`. Non-negotiable.
+4. **Link aggressively.** `[[ripfire-cli]]` in a daily note. Obsidian builds the graph for free.
+5. **Write short.** Your LLM is not your therapist. Facts. Dates. Names. Done.
 
-Example of a note that earns its keep (`people/sarah.md`):
+Example (`people/sarah.md`):
 
 ```markdown
 # Sarah Chen
@@ -313,6 +253,56 @@ Example of a note that earns its keep (`people/sarah.md`):
 - birthday: Mar 3
 - [[ripfire-cli]] for project context
 ```
+
+With **write-back on** you don't even have to write most of these — when you tell your AI "Sarah's birthday is March 3," the extractor proposes `people/sarah.md` with that fact, you hit approve in `bp-write review`, it's in the vault.
+
+---
+
+## security — your data is yours
+
+- **No credentials in this repo.** `.env` is gitignored. Fresh clones have zero secrets.
+- **Vault lives on your disk.** Markdown files in `~/BrainPass/vault/`. Doesn't leave unless you send it.
+- **Librarian binds to `127.0.0.1` only.** Not reachable from the internet.
+- **Human-session gate default ON.** Autonomous callers (cron jobs, test loops, buggy agent frameworks, supply-chain compromise) get `403` — `/recall` only answers when an AI CLI is actively running under your user with a real TTY. Your API key stops bleeding when you walk away.
+- **Auto-research is hardened against its own risks:** unforgeable XML envelope (prompt-injection-proof), CIDR-aware SSRF blocklist, resolve-all DNS (closes multi-A rebinding), 3s inline budget (won't stall your hook), cost-aware response footer (you see what you spent).
+- **NotebookLM is opt-in.** Google only sees your notes if you upload them yourself.
+
+If you can read files in `~/BrainPass/`, you can audit every byte your AI has access to.
+
+Full architecture + threat model: [`docs/gate.md`](docs/gate.md) and [`docs/brain-v3.md`](docs/brain-v3.md).
+
+---
+
+## CLIs you get
+
+| command | what it does |
+|---|---|
+| `bp-write review` | Walk pending write-back proposals (one-tap approve / reject / skip) |
+| `bp-analytics report` | One-shot "how's my brain doing" (hot / dead / patterns) |
+| `bp-research status` | Is auto-research enabled? What's today's cost? |
+| `bp-call-librarian` | Curl wrapper that fetches a gate ticket automatically |
+
+---
+
+## API endpoints
+
+| method | path | gated | what it does |
+|---|---|---|---|
+| GET  | `/health` | no | is the librarian alive? |
+| GET  | `/status` | no | full system status |
+| POST | `/recall` | **yes** | full 3-phase recall (vault + optional auto-research) |
+| GET  | `/query?q=...` | **yes** | search + compile in one call |
+| GET  | `/dreams?limit=N` | **yes** | browse sandboxed dream insights |
+| GET  | `/predictions?topic=T` | **yes** | predicted next topics |
+| GET  | `/changed?since=<iso>` | **yes** | recent vault changes |
+| GET  | `/timeline?topic=X` | **yes** | chronological fact evolution |
+| GET  | `/write-queue` | **yes** | pending write-back proposals |
+| POST | `/write-queue/{id}/approve` | **yes** | commit proposal to vault |
+| POST | `/write-queue/{id}/reject` | **yes** | discard proposal |
+| GET  | `/analytics/hot-notes?days=N` | **yes** | most-retrieved notes |
+| GET  | `/analytics/dead-notes?days=N` | **yes** | never-retrieved notes |
+| GET  | `/analytics/query-patterns?days=N` | **yes** | common query topics |
+| POST | `/clear-cache` | no | wipe session cache |
 
 ---
 
@@ -330,19 +320,25 @@ journalctl --user -u brainpass-librarian -n 50
 <details>
 <summary><b>my AI isn't using BrainPass</b></summary>
 
-Did you paste the magic instruction into your AI's system prompt? Probably not. Do it.
+Did you paste the magic instruction into your AI's system prompt? Probably not. Or wire the `hooks/brainpass-inject.sh` hook into your tool. Do one of those.
+</details>
+
+<details>
+<summary><b>every request returns 403</b></summary>
+
+The human-session gate doesn't see an AI CLI running with a TTY. Check: `systemctl --user status human-session-tracker`. Start it if it's down. If you're using a CLI the tracker doesn't recognize, add it to `BP_INTERACTIVE_PROCS` regex in `.env`. Or set `BP_GATE_DISABLED=1` in `.env` to turn off the gate (not recommended — it's what stops autonomous API-key burn).
 </details>
 
 <details>
 <summary><b>vault shows 0 files</b></summary>
 
-You haven't written any notes. Open Obsidian, make a note, save. Try again.
+You haven't written any notes. Open Obsidian, make a note, save. Try again. Or let auto-research handle cold-start — ask a question, approve the draft in `bp-write review`.
 </details>
 
 <details>
 <summary><b>it's slow</b></summary>
 
-It's not BrainPass — search is ~50ms. It's your LLM's response time. Try a smaller / faster model, or Groq's free tier.
+Search is ~50ms. Inline research is capped at 3s. Anything above that is your LLM provider's response time. Try Groq's free tier (fastest) or a smaller model.
 </details>
 
 <details>
@@ -351,60 +347,30 @@ It's not BrainPass — search is ~50ms. It's your LLM's response time. Try a sma
 Edit `~/BrainPass/config/.env`, swap `LLM_PROVIDER` and `LLM_MODEL`, restart: `systemctl --user restart brainpass-librarian`. Your notes stay. Your AI doesn't forget.
 </details>
 
----
+<details>
+<summary><b>upgrade to latest</b></summary>
 
-## security
-
-Your data is yours. That's not a marketing line, it's the architecture:
-
-- **No credentials in this repo.** `.env` is gitignored. Fresh clones have zero secrets.
-- **Vault lives on your disk.** Markdown files in `~/BrainPass/vault/`. Doesn't leave unless you send it.
-- **Librarian binds to `127.0.0.1` only.** Not reachable from the internet unless you change that on purpose.
-- **NotebookLM is opt-in.** Google only sees your notes if you upload them yourself.
-- **Human-session gate is default ON.** Autonomous callers (cron jobs, test loops, rogue agent frameworks, supply-chain compromise) can't drain your LLM API budget while you're away from the keyboard — `/recall` only answers when an AI CLI is actively running under your user with a real TTY. Everything else gets `403`.
-
-If you can read the files in `~/BrainPass/`, you can audit every byte your AI has access to. No black box.
-
-### the autonomous-burn problem (why the gate exists)
-
-The librarian listens on `127.0.0.1:7778` with **no authentication** — that's how any AI tool on your box can talk to it without configuration. But "no auth" also means any *other* local process can hit it: a misbehaving cron job, an IDE autocomplete on a loop, an agent framework spawning background workers, a supply-chain compromise in some random npm package you installed last Tuesday. Every one of those calls goes to your Groq/OpenAI/Anthropic key. Your budget bleeds 24/7 whether you're at the keyboard or not.
-
-The human-session gate fixes this. A lightweight daemon (`human-session-tracker`) watches for AI CLI processes (`claude`, `cursor`, `gemini`, `windsurf`, `aider`, `continue`, `cline`, `cody`, `copilot` — configurable regex). When one is running with a real TTY, the daemon issues short-lived HMAC-signed tickets (30s TTL, secret rotates on every daemon restart) over a unix socket. The librarian rejects any request without a valid, non-expired ticket.
-
-**What's gated:** `/recall`, `/query`, `/dreams`, `/predictions` — every endpoint that spends LLM tokens.
-**What's open:** `/health`, `/status`, `/clear-cache` — local probes with no LLM call.
-
-The default hook (`hooks/brainpass-inject.sh`) and CLI helper (`bin/bp-call-librarian`) grab tickets automatically — if you're driving an AI CLI, you never notice the gate. If you want to disable it (not recommended), set `BP_GATE_DISABLED=1` in `config/.env` and restart the librarian.
-
-Full architecture, ticket format, troubleshooting, and the 19-test verification suite live in [`docs/gate.md`](docs/gate.md).
-
-### v3 — the self-feeding brain
-
-v3 closes the loop between you, your AI, your vault, and the open web. **Four new features, all default-on, all individually disable-able:**
-
-- **Write-back** — AI responses get parsed for save-worthy facts. Proposals queue up. One-tap approve (`bp-write review`) and they're in the vault forever. You stop having to type notes to keep it growing.
-- **Temporal awareness** — recent notes outrank old ones (30-day half-life by default). `/changed?since=2026-04-10` surfaces what moved. `/timeline?topic=X` shows the chronological fact evolution — catches "you said Rust 6 months ago but Go last Tuesday."
-- **Self-teaching vault** — `bp-analytics report` shows your hot notes (retrieved constantly), dead notes (never touched in 90d), and query-patterns. The vault gets smarter *from being used*, not just from you adding to it.
-- **Auto-research** — when the vault has nothing (fewer than 2 hits), the librarian fetches Wikipedia + arXiv + DuckDuckGo (+ optional open web), synthesizes with your LLM, and enqueues the findings via write-back. **Next time you ask, it's in your vault.** The cold-start problem is solved.
-
-Combined: the vault grows on your **revealed preference** (topics you actually ask about) without you lifting a finger.
-
-Security: every new surface is locked down — unforgeable XML envelope (prompt-injection-proof), CIDR-aware SSRF blocklist (resolves all A/AAAA records, rejects if any is private, re-pins on redirect), 3s inline research budget (hook-safe), future exceptions never propagate into `/recall`. Full threat model + 84-test verification suite in [`docs/brain-v3.md`](docs/brain-v3.md).
+```bash
+cd ~/BrainPass && git pull && ./install.sh && systemctl --user restart brainpass-librarian
+```
+Idempotent. Preserves your config, vault, and analytics history.
+</details>
 
 ---
 
-## architecture, for the curious
+## architecture
 
 ```
 ┌─────────────────────────────────────────────┐
 │              your LLM                       │
 │     (Claude / GPT / Kimi / local)           │
 └──────────────────┬──────────────────────────┘
-                   │ POST /recall
+                   │ POST /recall (+ gate ticket)
                    ▼
 ┌─────────────────────────────────────────────┐
-│          BrainPass Librarian                │
-│        (Python HTTP on :7778)               │
+│  Human-Session Gate  (403 if no human)      │
+├─────────────────────────────────────────────┤
+│  BrainPass Librarian  (Python :7778)        │
 │                                             │
 │  ┌─────────┐ ┌──────────┐ ┌─────────────┐  │
 │  │  BM25   │ │ Semantic │ │  Knowledge  │  │
@@ -412,43 +378,39 @@ Security: every new surface is locked down — unforgeable XML envelope (prompt-
 │  └────┬────┘ └────┬─────┘ └──────┬──────┘  │
 │       └───────────┼──────────────┘          │
 │                   ▼                         │
-│         ┌─────────────────┐                 │
-│         │   RRF Merge +   │                 │
-│         │   Conflict Det  │                 │
-│         └────────┬────────┘                 │
-│                  │                          │
-│  ┌───────────────┼───────────────┐          │
-│  │               │               │          │
-│  ▼               ▼               ▼          │
-│ Dream       Predictive      Compiled        │
-│ Engine      Pre-fetch       Briefing        │
-│ (.dreams/)  (bonus ctx)     (citations)     │
+│            RRF Merge + Conflict Det         │
+│                   │                         │
+│  ┌──────┬────────┼────────┬──────────┐     │
+│  ▼      ▼        ▼        ▼          ▼     │
+│ Dream  Predict  Writeback Temporal Research │
+│ (.dm)  (Markov) (queue)   (decay)  (web)   │
 └──────────────────┬──────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────┐
-│          your Obsidian vault                │
-│        (markdown in ~/BrainPass/)           │
-│  daily/  projects/  people/                 │
-│  topics/  sources/  .dreams/ (sandboxed)    │
+│    your Obsidian vault  (markdown files)    │
+│ daily/ projects/ people/ topics/ sources/   │
 └─────────────────────────────────────────────┘
 ```
 
-~1700 lines of Python. Five engines. Zero SaaS dependencies. Just good plumbing.
-
 ---
 
-## API endpoints
+## what makes BrainPass different
 
-| method | path | what it does |
-|---|---|---|
-| GET | `/health` | is the librarian alive? |
-| GET | `/status` | full system status — engines, docs, health flags |
-| GET | `/query?q=...` | search + compile in one call |
-| POST | `/recall` | full 3-phase recall (decode → search → compile) |
-| POST | `/clear-cache` | wipe session cache |
-| GET | `/dreams` | browse sandboxed dream insights |
-| GET | `/predictions?topic=...` | see predicted next topics |
+| feature | ChatGPT memory | Mem0 / MemGPT | BrainPass |
+|---|---|---|---|
+| your data stays local | no | depends | **yes, always** |
+| works with any LLM | no | some | **all of them** |
+| you can audit everything | no | kinda | **yes, it's markdown** |
+| search engines | 1 (summary) | 1 (vector) | **5 + fusion merge** |
+| conflict detection | no | no | **yes** |
+| write-back from conversation | no | manual | **auto (with approval)** |
+| auto-research on empty vault | no | no | **yes (default ON)** |
+| temporal decay + staleness | no | no | **yes** |
+| usage analytics (hot/dead) | no | no | **yes** |
+| autonomous-burn protection | n/a | no | **yes (default ON gate)** |
+| cost | $20/mo | varies | **$0 (Groq free tier)** |
+| setup time | built-in | 30+ min | **10 min** |
 
 ---
 
@@ -460,22 +422,6 @@ Security: every new surface is locked down — unforgeable XML envelope (prompt-
 - people who trust their own disk more than someone else's cloud
 - anyone who wants their AI to get smarter the more they use it
 - people who want AI memory without giving their data to a corporation
-
----
-
-## what makes BrainPass different
-
-| feature | ChatGPT memory | Mem0 / MemGPT | BrainPass |
-|---|---|---|---|
-| your data stays local | no | depends | **yes, always** |
-| works with any LLM | no | some | **all of them** |
-| you can audit everything | no | kinda | **yes, it's markdown** |
-| search engines | 1 (summary) | 1 (vector) | **5 (BM25 + semantic + graph + dreams + predictions)** |
-| conflict detection | no | no | **yes** |
-| predictive pre-fetch | no | no | **yes** |
-| dream engine | no | no | **yes (sandboxed)** |
-| cost | $20/mo | varies | **$0 (Groq free tier)** |
-| setup time | built-in | 30+ min | **10 min** |
 
 ---
 
@@ -491,6 +437,6 @@ Security: every new surface is locked down — unforgeable XML envelope (prompt-
 
 <br><br>
 
-*five engines. zero SaaS. your notes, your disk, your brain. just a librarian who never sleeps.*
+*five engines. four self-feeding features. zero SaaS. your notes, your disk, your brain.*
 
 </div>
