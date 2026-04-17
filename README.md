@@ -21,7 +21,7 @@
 
 <br>
 
-<img src="https://img.shields.io/badge/v2.0-hybrid_search-EC4899?style=flat-square&labelColor=1E1B4B">
+<img src="https://img.shields.io/badge/v2.1-5_engine_brain-EC4899?style=flat-square&labelColor=1E1B4B">
 <img src="https://img.shields.io/badge/ships-today-EC4899?style=flat-square&labelColor=1E1B4B">
 <img src="https://img.shields.io/badge/setup-10_minutes-8B5CF6?style=flat-square&labelColor=1E1B4B">
 <img src="https://img.shields.io/badge/runs_on-your_laptop-6366F1?style=flat-square&labelColor=1E1B4B">
@@ -136,21 +136,31 @@ you ← "wireframes — mobile breakpoint still open. Sarah needs
 
 That's it. No LangChain. No $20/month SaaS middleman. Just a librarian, a stack of notes, and a ~100-line shell hook that fires on every message so your AI never has to remember to check.
 
-### v2.0 — triple-engine search
+### v2.1 — five-engine brain
 
-BrainPass v2 doesn't just keyword search your notes. It runs **three search engines in parallel** and merges the results:
+BrainPass doesn't just keyword search your notes. It runs **five engines** that work together:
 
-| engine | what it does | how it works |
-|---|---|---|
-| **BM25** | keyword search | classic text matching — fast, reliable, always on |
-| **Semantic** *(optional)* | meaning search | ChromaDB + vector embeddings — finds notes that mean the same thing even with different words |
-| **Knowledge Graph** | entity search | SQLite graph of every person, project, and concept in your vault — finds related notes through connections, not keywords |
+| # | engine | what it does | how it works |
+|---|---|---|---|
+| 1 | **BM25** | keyword search | classic text matching — fast, reliable, always on, zero dependencies |
+| 2 | **Semantic** *(optional)* | meaning search | ChromaDB + vector embeddings — finds notes that *mean* the same thing even with completely different words |
+| 3 | **Knowledge Graph** | entity search | SQLite graph of every person, project, and concept in your vault — finds related notes through connections, not keywords |
+| 4 | **Dream Engine** | creative insights | generates speculative connections between unrelated notes while idle — sandboxed in `.dreams/`, never contaminates real data |
+| 5 | **Predictive Pre-fetch** | anticipation | learns what you ask about next using Markov chains — pre-fetches bonus context before you even type |
 
-Results are combined using **Reciprocal Rank Fusion (RRF)** — the same merge algorithm Google uses. A note that shows up in all three engines ranks higher than one that only matches keywords.
+Search results from engines 1-3 are combined using **Reciprocal Rank Fusion (RRF)** — the same merge algorithm Google uses. A note that shows up in all three engines ranks higher than one that only matches keywords.
 
-**Plus: conflict detection.** When your notes contradict each other (different dates, different claims), BrainPass flags it instead of silently picking one.
+**Conflict detection** — when your notes contradict each other (different dates, different claims about the same thing), BrainPass flags it instead of silently picking one.
 
-The semantic engine is **optional** — install `chromadb` to enable it, or don't. BM25 + knowledge graph work with zero pip dependencies. Everything degrades gracefully.
+**Dream Engine** — while the librarian is idle, it picks random entities from your knowledge graph, asks the LLM to find non-obvious connections, and saves them to `vault/.dreams/`. Dreams are **completely sandboxed** — main search never sees them. Browse them with `GET /dreams` when you want inspiration. If a dream turns out to be a real insight, move it to the real vault yourself.
+
+**Predictive Pre-fetch** — tracks topic transitions (after asking about X, you usually ask about Y). After a few queries, it starts pre-fetching the predicted next topic and appends it as bonus context. Gets smarter every query. No training step. Just a JSON file counting transitions.
+
+Everything is **optional and graceful**:
+- No chromadb? BM25 + knowledge graph + dreams + predictions still work.
+- No API key? BM25 keyword search still works standalone.
+- Turn off dreams? Set `DREAM_ENABLED=false` in `.env`.
+- Nothing ever crashes the service. Every engine fails independently.
 
 ### what makes it automatic
 
@@ -165,7 +175,8 @@ If your tool doesn't support pre-hooks (most web UIs), there's a fallback: paste
 <div align="center">
 
 <img src="https://img.shields.io/badge/Obsidian-8B5CF6?style=flat-square&logo=obsidian&logoColor=white">
-<img src="https://img.shields.io/badge/NotebookLM-6366F1?style=flat-square&logo=google&logoColor=white">
+<img src="https://img.shields.io/badge/ChromaDB-FF6F61?style=flat-square">
+<img src="https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white">
 <img src="https://img.shields.io/badge/Python_3.10+-3B82F6?style=flat-square&logo=python&logoColor=white">
 <img src="https://img.shields.io/badge/Your_LLM-EC4899?style=flat-square">
 
@@ -174,11 +185,13 @@ If your tool doesn't support pre-hooks (most web UIs), there's a fallback: paste
 | piece | what it is | why |
 |---|---|---|
 | **Obsidian** | free markdown notebook | your notes, your disk, your links |
-| **NotebookLM** *(optional)* | Google's smart search | free tier, lazy setup, good recall |
-| **Librarian** | ~1500 lines of Python | BM25 + semantic + knowledge graph + conflict detection |
+| **ChromaDB** *(optional)* | vector embedding database | semantic search — finds notes by meaning, not just keywords |
+| **SQLite** | embedded graph database | knowledge graph — maps every entity and relationship in your vault |
+| **Librarian** | ~1700 lines of Python | 5 engines: BM25 + semantic + graph + dreams + predictions |
 | **Your LLM** | Claude / GPT / Kimi / Llama / whatever | swap it anytime, notes don't care |
+| **NotebookLM** *(optional)* | Google's smart search | free tier, lazy setup, good recall |
 
-Boring tech on purpose. Every part of this stack has been stable for years. No bleeding edge. No "wait for v2". It runs today, on your laptop, with whatever you already have.
+Boring tech on purpose. Stable libraries. Runs on your laptop. No cloud required.
 
 ---
 
@@ -356,32 +369,59 @@ If you can read the files in `~/BrainPass/`, you can audit every byte your AI ha
 ## architecture, for the curious
 
 ```
-┌─────────────────────────────────────────┐
-│             your LLM                    │
-│    (Claude / GPT / Kimi / local)        │
-└──────────────────┬──────────────────────┘
+┌─────────────────────────────────────────────┐
+│              your LLM                       │
+│     (Claude / GPT / Kimi / local)           │
+└──────────────────┬──────────────────────────┘
                    │ POST /recall
                    ▼
-┌─────────────────────────────────────────┐
-│        BrainPass Librarian              │
-│      (Python HTTP on :7778)             │
-│  • BM25 keyword search                  │
-│  • ChromaDB semantic search (optional)  │
-│  • SQLite knowledge graph               │
-│  • RRF merge + conflict detection       │
-│  • returns ranked, cited note snippets  │
-└──────────────────┬──────────────────────┘
+┌─────────────────────────────────────────────┐
+│          BrainPass Librarian                │
+│        (Python HTTP on :7778)               │
+│                                             │
+│  ┌─────────┐ ┌──────────┐ ┌─────────────┐  │
+│  │  BM25   │ │ Semantic │ │  Knowledge  │  │
+│  │ keyword │ │ ChromaDB │ │    Graph    │  │
+│  └────┬────┘ └────┬─────┘ └──────┬──────┘  │
+│       └───────────┼──────────────┘          │
+│                   ▼                         │
+│         ┌─────────────────┐                 │
+│         │   RRF Merge +   │                 │
+│         │   Conflict Det  │                 │
+│         └────────┬────────┘                 │
+│                  │                          │
+│  ┌───────────────┼───────────────┐          │
+│  │               │               │          │
+│  ▼               ▼               ▼          │
+│ Dream       Predictive      Compiled        │
+│ Engine      Pre-fetch       Briefing        │
+│ (.dreams/)  (bonus ctx)     (citations)     │
+└──────────────────┬──────────────────────────┘
                    │
                    ▼
-┌─────────────────────────────────────────┐
-│        your Obsidian vault              │
-│      (markdown in ~/BrainPass/)         │
-│  daily/  projects/  people/             │
-│  topics/  sources/                      │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│          your Obsidian vault                │
+│        (markdown in ~/BrainPass/)           │
+│  daily/  projects/  people/                 │
+│  topics/  sources/  .dreams/ (sandboxed)    │
+└─────────────────────────────────────────────┘
 ```
 
-~1500 lines of Python. Three search engines. Zero SaaS dependencies. Just good plumbing.
+~1700 lines of Python. Five engines. Zero SaaS dependencies. Just good plumbing.
+
+---
+
+## API endpoints
+
+| method | path | what it does |
+|---|---|---|
+| GET | `/health` | is the librarian alive? |
+| GET | `/status` | full system status — engines, docs, health flags |
+| GET | `/query?q=...` | search + compile in one call |
+| POST | `/recall` | full 3-phase recall (decode → search → compile) |
+| POST | `/clear-cache` | wipe session cache |
+| GET | `/dreams` | browse sandboxed dream insights |
+| GET | `/predictions?topic=...` | see predicted next topics |
 
 ---
 
@@ -391,6 +431,24 @@ If you can read the files in `~/BrainPass/`, you can audit every byte your AI ha
 - builders who want their AI to actually know the project
 - anyone who's watched an LLM hallucinate their own preferences back at them
 - people who trust their own disk more than someone else's cloud
+- anyone who wants their AI to get smarter the more they use it
+- people who want AI memory without giving their data to a corporation
+
+---
+
+## what makes BrainPass different
+
+| feature | ChatGPT memory | Mem0 / MemGPT | BrainPass |
+|---|---|---|---|
+| your data stays local | no | depends | **yes, always** |
+| works with any LLM | no | some | **all of them** |
+| you can audit everything | no | kinda | **yes, it's markdown** |
+| search engines | 1 (summary) | 1 (vector) | **5 (BM25 + semantic + graph + dreams + predictions)** |
+| conflict detection | no | no | **yes** |
+| predictive pre-fetch | no | no | **yes** |
+| dream engine | no | no | **yes (sandboxed)** |
+| cost | $20/mo | varies | **$0 (Groq free tier)** |
+| setup time | built-in | 30+ min | **10 min** |
 
 ---
 
@@ -406,6 +464,6 @@ If you can read the files in `~/BrainPass/`, you can audit every byte your AI ha
 
 <br><br>
 
-*boring tech on purpose. no LangChain, no SaaS tax. three search engines that run on your laptop. just notes and a librarian.*
+*five engines. zero SaaS. your notes, your disk, your brain. just a librarian who never sleeps.*
 
 </div>
