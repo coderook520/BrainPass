@@ -1391,15 +1391,213 @@ def recall(raw_message, topic_hint=""):
     if topic_changed or topic == "none":
         save_topic(new_topic)
 
+    # Record topic transition for predictive pre-fetch
+    _PREDICTOR.record_transition(topic, new_topic)
+
+    # Pre-fetch predicted next topics in background
+    predicted = _PREDICTOR.get_predictions(new_topic, top_k=2)
+    bonus_context = ""
+    if predicted:
+        bonus_parts = []
+        for pred_topic in predicted:
+            pred_results = search_files(pred_topic, max_results=2)
+            for pr in pred_results:
+                bonus_parts.append(f"[predicted: {pred_topic}] {pr.get('preview', '')[:200]}")
+        if bonus_parts:
+            bonus_context = "\n\n--- BONUS (predicted next) ---\n" + "\n".join(bonus_parts[:3])
+
     return {
-        "result": context,
+        "result": (context + bonus_context) if bonus_context and context else context,
         "topic": new_topic,
         "sources": source_names,
         "intent": intent,
         "confidence": confidence,
         "conflicts": conflicts if conflicts and conflicts.lower() != "none" else "",
+        "predictions": predicted,
         "score_method": "hybrid-rrf" if SEMANTIC_ENABLED else "bm25-chunked",
     }
+
+
+# ─── PREDICTIVE PRE-FETCH (Markov Chain) ────────────────────────────
+_PREDICTIONS_FILE = _ACCESS_LOG_DIR / "predictions.json"
+
+
+class PredictiveCache:
+    """Markov chain topic predictor. Learns what you ask about next."""
+
+    def __init__(self, path):
+        self.path = str(path)
+        self._transitions = {}
+        self._load()
+
+    def _load(self):
+        try:
+            if Path(self.path).exists():
+                data = json.loads(Path(self.path).read_text())
+                if isinstance(data, dict):
+                    self._transitions = data
+        except Exception:
+            self._transitions = {}
+
+    def _save(self):
+        try:
+            os.makedirs(os.path.dirname(self.path), mode=0o700, exist_ok=True)
+            Path(self.path).write_text(json.dumps(self._transitions, indent=2))
+        except Exception:
+            pass
+
+    def record_transition(self, from_topic, to_topic):
+        """Record: after from_topic, user asked about to_topic."""
+        if not from_topic or not to_topic or from_topic == "none" or to_topic == "none":
+            return
+        if from_topic == to_topic:
+            return
+        from_key = from_topic.lower().strip()
+        to_key = to_topic.lower().strip()
+        if from_key not in self._transitions:
+            self._transitions[from_key] = {}
+        self._transitions[from_key][to_key] = self._transitions[from_key].get(to_key, 0) + 1
+        self._save()
+
+    def get_predictions(self, current_topic, top_k=3):
+        """Predict top_k most likely next topics after current_topic."""
+        if not current_topic or current_topic == "none":
+            return []
+        key = current_topic.lower().strip()
+        nexts = self._transitions.get(key, {})
+        if not nexts:
+            return []
+        sorted_nexts = sorted(nexts.items(), key=lambda x: x[1], reverse=True)
+        return [t for t, c in sorted_nexts[:top_k] if c >= 1]
+
+
+_PREDICTOR = PredictiveCache(_PREDICTIONS_FILE)
+
+
+# ─── DREAM ENGINE (sandboxed) ───────────────────────────────────────
+_DREAMS_DIR = VAULT_PATH / ".dreams"
+_DREAM_LOCK = threading.Lock()
+DREAM_ENABLED = os.environ.get("DREAM_ENABLED", "true").lower() == "true"
+DREAM_INTERVAL = int(os.environ.get("DREAM_INTERVAL", "1800"))  # 30 min default
+
+
+def _generate_dream():
+    """Generate one dream insight from random entity pairs in the knowledge graph."""
+    if not DREAM_ENABLED or not _KNOWLEDGE_GRAPH or not _KNOWLEDGE_GRAPH._healthy:
+        return None
+
+    _KNOWLEDGE_GRAPH._ensure_db()
+    if not _KNOWLEDGE_GRAPH._conn:
+        return None
+
+    try:
+        # Get random entities from the graph
+        entities = _KNOWLEDGE_GRAPH._conn.execute(
+            "SELECT DISTINCT name FROM entities ORDER BY RANDOM() LIMIT 5"
+        ).fetchall()
+        if len(entities) < 2:
+            return None
+
+        entity_names = [e[0] for e in entities]
+
+        # Get their source files for context
+        context_parts = []
+        for name in entity_names[:3]:
+            results = search_files(name, max_results=1)
+            for r in results:
+                context_parts.append(f"[{r.get('file', '')}] {r.get('preview', '')[:300]}")
+
+        if not context_parts:
+            return None
+
+        dream_prompt = (
+            f"You are a creative insight engine. Given these knowledge base excerpts about "
+            f"seemingly unrelated topics, find ONE non-obvious connection or insight.\n\n"
+            f"ENTITIES: {', '.join(entity_names)}\n\n"
+            f"EXCERPTS:\n" + "\n\n".join(context_parts) + "\n\n"
+            f"Generate ONE insight (2-3 sentences max). Be specific. "
+            f"Reference the entities by name. If there's no real connection, say SKIP."
+        )
+
+        response = call_llm(
+            [{"role": "system", "content": "You generate creative insights by connecting concepts. Be concise."},
+             {"role": "user", "content": dream_prompt}],
+            max_tokens=200
+        )
+
+        if not response or "SKIP" in response.upper() or response.startswith("{"):
+            return None
+
+        return {
+            "insight": response.strip(),
+            "entities": entity_names,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        print(f"[warn] Dream generation failed: {e}", file=sys.stderr)
+        return None
+
+
+def _save_dream(dream):
+    """Save a dream to the sandboxed .dreams/ directory."""
+    try:
+        os.makedirs(str(_DREAMS_DIR), mode=0o700, exist_ok=True)
+        ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        filename = f"dream_{ts}.md"
+        filepath = _DREAMS_DIR / filename
+
+        content = (
+            f"---\n"
+            f"type: dream\n"
+            f"status: AI GENERATED — NOT VERIFIED\n"
+            f"entities: [{', '.join(dream['entities'])}]\n"
+            f"created: {dream['timestamp']}\n"
+            f"---\n\n"
+            f"# Dream Insight\n\n"
+            f"> **This was generated by the Dream Engine. It is speculative, not factual.**\n"
+            f"> **Do NOT treat this as a real note. Move to vault/ only if verified.**\n\n"
+            f"{dream['insight']}\n\n"
+            f"**Entities connected:** {', '.join(dream['entities'])}\n"
+        )
+
+        filepath.write_text(content)
+        return str(filepath)
+    except Exception as e:
+        print(f"[warn] Dream save failed: {e}", file=sys.stderr)
+        return None
+
+
+def _dream_loop():
+    """Background dream generation loop."""
+    while True:
+        time.sleep(DREAM_INTERVAL)
+        if not DREAM_ENABLED:
+            continue
+        if not _DREAM_LOCK.acquire(blocking=False):
+            continue
+        try:
+            dream = _generate_dream()
+            if dream:
+                path = _save_dream(dream)
+                if path:
+                    print(f"[dream] generated: {path}", file=sys.stderr)
+        finally:
+            _DREAM_LOCK.release()
+
+
+def get_dreams(limit=10):
+    """Read recent dreams from the sandbox."""
+    if not _DREAMS_DIR.exists():
+        return []
+    dreams = []
+    for f in sorted(_DREAMS_DIR.glob("dream_*.md"), reverse=True)[:limit]:
+        try:
+            content = f.read_text(errors="ignore")
+            dreams.append({"file": f.name, "content": content})
+        except Exception:
+            pass
+    return dreams
 
 
 # ─── HTTP SERVER ─────────────────────────────────────────────────────
@@ -1435,11 +1633,21 @@ class LibrarianHandler(BaseHTTPRequestHandler):
                 "chunk_size": CHUNK_SIZE,
                 "notebooklm_url": NOTEBOOKLM_URL or None,
                 "auto_inject_hook": "hooks/brainpass-inject.sh",
+                "dream_enabled": DREAM_ENABLED,
+                "dream_interval": DREAM_INTERVAL,
+                "dream_count": len(list(_DREAMS_DIR.glob("dream_*.md"))) if _DREAMS_DIR.exists() else 0,
+                "prediction_transitions": len(_PREDICTOR._transitions),
             })
         elif path == "/query":
             query = parsed.get("q", [""])[0]
             result = recall(query, topic_hint=query)
             self._send_json(result)
+        elif path == "/dreams":
+            limit = int(parsed.get("limit", ["10"])[0])
+            self._send_json({"dreams": get_dreams(limit=limit), "dream_enabled": DREAM_ENABLED})
+        elif path == "/predictions":
+            topic = parsed.get("topic", [""])[0]
+            self._send_json({"predictions": _PREDICTOR.get_predictions(topic), "transitions": len(_PREDICTOR._transitions)})
         else:
             self._send_json({"error": "unknown endpoint"}, status=404)
 
@@ -1484,6 +1692,13 @@ def serve():
 
     signal.signal(signal.SIGTERM, graceful_exit)
     signal.signal(signal.SIGINT, graceful_exit)
+
+    # Start dream engine background loop
+    if DREAM_ENABLED:
+        dream_thread = threading.Thread(target=_dream_loop, daemon=True)
+        dream_thread.start()
+        print(f"  dreams=ON interval={DREAM_INTERVAL}s dir={_DREAMS_DIR}", file=sys.stderr)
+
     try:
         server.serve_forever()
     finally:
