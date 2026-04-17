@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""bp-research — manual research trigger + cost report."""
+from __future__ import annotations
+import os
+import sys
+import json
+
+_SRC = os.path.expanduser("~/BrainPass/src")
+if os.path.isdir(_SRC) and _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+try:
+    import bp_research
+    from bp_research.cost_tracker import rolling_totals
+except ImportError as e:
+    print(f"error: bp_research not importable: {e}", file=sys.stderr)
+    sys.exit(1)
+
+
+def main() -> int:
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd == "status":
+        totals = rolling_totals()
+        print(f"enabled: {bp_research.ENABLED}")
+        print(f"mode:    {bp_research.MODE}")
+        print(f"ready:   {bp_research.module_ready()}")
+        print(f"cost last 24h: ${totals.get('24h_usd', 0.0):.4f}")
+        print(f"cost last  7d: ${totals.get('7d_usd', 0.0):.4f}")
+        return 0
+    if cmd == "cost":
+        totals = rolling_totals()
+        print(json.dumps(totals, indent=2))
+        return 0
+    if cmd == "run":
+        query = " ".join(sys.argv[2:])
+        if not query:
+            print("usage: bp-research run <query>", file=sys.stderr)
+            return 1
+        # Force explicit-fire regardless of mode/vault
+        result = bp_research.run_inline_or_background(query, vault_hits=0)
+        if result is None:
+            print("no result (research disabled or no sources)")
+            return 0
+        print(json.dumps(result, indent=2))
+        return 0
+    print("usage: bp-research {status|cost|run <query>}", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

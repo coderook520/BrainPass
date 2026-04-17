@@ -20,14 +20,30 @@ or returns 403.
 import base64
 import hmac
 import hashlib
-import json
 import os
+import re
 import socket
 import syslog
 import time
 from collections import OrderedDict
 from threading import Lock
-from urllib.parse import urlparse
+from typing import Iterable
+
+try:
+    from bp_gate.paths import bp_state_file
+    from bp_gate.io import safe_append_jsonl
+    _BP_IO_AVAILABLE = True
+except ImportError:
+    _BP_IO_AVAILABLE = False
+
+try:
+    from bp_routing import normalize_request_path
+    _BP_ROUTING_AVAILABLE = True
+except ImportError:
+    _BP_ROUTING_AVAILABLE = False
+    def normalize_request_path(raw: str) -> str | None:  # fallback
+        from urllib.parse import urlparse
+        return urlparse(raw).path if raw else None
 
 UID = os.getuid()
 RUN_DIR = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{UID}")
@@ -35,11 +51,14 @@ SECRET_PATH = f"{RUN_DIR}/bp-human-session.secret"
 FLAG_PATH = f"{RUN_DIR}/bp-human-session.active"
 SOCK_PATH = f"{RUN_DIR}/bp-human-session.sock"
 
-# Audit log — default under $HOME, override via BP_AUDIT_LOG
-_AUDIT_LOG = os.environ.get(
-    "BP_AUDIT_LOG",
-    os.path.expanduser("~/.local/state/brainpass/gate.jsonl"),
-)
+# Audit log path (§G5 — unified via bp_state_file when available)
+if _BP_IO_AVAILABLE and "BP_AUDIT_LOG" not in os.environ:
+    _AUDIT_LOG = str(bp_state_file("gate.jsonl"))
+else:
+    _AUDIT_LOG = os.environ.get(
+        "BP_AUDIT_LOG",
+        os.path.expanduser("~/.local/state/brainpass/gate.jsonl"),
+    )
 
 # Populated by the librarian's import block. Don't set them here.
 GATED_POST: set = set()
@@ -130,18 +149,25 @@ def _verify_token(token):
     return True
 
 
-def _audit_gate_decision(verified, path, method, caller_addr=None):
+def _audit_gate_decision(verified, path, method, caller_addr=None, decision=None):
     """Emit structured JSONL of every gate decision. Never raises."""
+    rec = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "event": "gate_decision",
+        "human_session_verified": bool(verified),
+        "method": method,
+        "path": path[:200] if isinstance(path, str) else str(path)[:200],
+        "caller_addr": caller_addr or "",
+    }
+    if decision is not None:
+        rec["decision"] = decision
+    if _BP_IO_AVAILABLE:
+        safe_append_jsonl(_AUDIT_LOG, rec)
+        return
+    # Fallback path when bp_gate.io not yet importable (e.g. during install)
     try:
-        rec = {
-            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "event": "gate_decision",
-            "human_session_verified": bool(verified),
-            "method": method,
-            "path": path,
-            "caller_addr": caller_addr or "",
-        }
-        line = (json.dumps(rec) + "\n").encode()
+        import json as _json
+        line = (_json.dumps(rec) + "\n").encode()
         os.makedirs(os.path.dirname(_AUDIT_LOG), mode=0o700, exist_ok=True)
         with open(_AUDIT_LOG, "ab") as f:
             f.write(line)
@@ -154,17 +180,37 @@ def _audit_gate_decision(verified, path, method, caller_addr=None):
         pass
 
 
-def _is_open_path(path):
+def _path_in_gated_set(path: str, gated_set: Iterable[str]) -> bool:
+    """§G1 — exact-match first, glob fallback. Never crosses '/'."""
+    if not path:
+        return False
+    if path in gated_set:
+        return True
+    for entry in gated_set:
+        if "*" not in entry and "?" not in entry:
+            continue
+        parts: list[str] = []
+        for ch in entry:
+            if ch == "*":
+                parts.append(r"[^/]+")
+            elif ch == "?":
+                parts.append(r"[^/]")
+            else:
+                parts.append(re.escape(ch))
+        if re.match("^" + "".join(parts) + "$", path):
+            return True
+    return False
+
+
+def _is_open_path(path: str) -> bool:
     if path in OPEN_ALWAYS:
         return True
-    return any(path == p or path.startswith(p + "/") for p in OPEN_ALWAYS)
+    return _path_in_gated_set(path, OPEN_ALWAYS)
 
 
-def _is_gated_path(method, path):
+def _is_gated_path(method: str, path: str) -> bool:
     gated = GATED_POST if method == "POST" else GATED_GET
-    if path in gated:
-        return True
-    return any(path == g or path.startswith(g + "/") for g in gated)
+    return _path_in_gated_set(path, gated)
 
 
 class HumanSessionGateMixin:
@@ -217,13 +263,25 @@ class HumanSessionGateMixin:
         return True
 
     def do_POST(self):
-        path = urlparse(self.path).path
-        if not self._gate_pre_dispatch("POST", path):
+        norm = normalize_request_path(self.path)
+        if norm is None:
+            caller = getattr(self, "client_address", (None,))[0] if hasattr(self, "client_address") else None
+            _audit_gate_decision(False, self.path, "POST", caller,
+                                  decision="rejected_malformed_path")
+            self.send_error(400, "malformed path")
+            return
+        if not self._gate_pre_dispatch("POST", norm):
             return
         self._do_POST_orig()
 
     def do_GET(self):
-        path = urlparse(self.path).path
-        if not self._gate_pre_dispatch("GET", path):
+        norm = normalize_request_path(self.path)
+        if norm is None:
+            caller = getattr(self, "client_address", (None,))[0] if hasattr(self, "client_address") else None
+            _audit_gate_decision(False, self.path, "GET", caller,
+                                  decision="rejected_malformed_path")
+            self.send_error(400, "malformed path")
+            return
+        if not self._gate_pre_dispatch("GET", norm):
             return
         self._do_GET_orig()

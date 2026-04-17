@@ -94,6 +94,40 @@ if [ ! -f "$INSTALL_DIR/config/identity/MEMORY.md" ]; then
     echo "[ok] created config/identity/MEMORY.md"
 fi
 
+# ─── Brain v3 state dir + migration (§G5 / §W15) ─────────────────────
+BP_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/brainpass"
+mkdir -p "$BP_STATE"
+chmod 700 "$BP_STATE"
+
+VERSION_FILE="$BP_STATE/version"
+PREV_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "0")
+CURRENT_VERSION="3"
+
+if [ "$PREV_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "[..] migrating BrainPass state: v$PREV_VERSION → v$CURRENT_VERSION"
+    touch "$BP_STATE/recall-log.jsonl"
+    chmod 600 "$BP_STATE/recall-log.jsonl"
+    touch "$BP_STATE/research-cost.jsonl"
+    chmod 600 "$BP_STATE/research-cost.jsonl"
+    if [ ! -f "$BP_STATE/writeback-queue.sqlite" ]; then
+        python3 -c "
+import sys; sys.path.insert(0, '$INSTALL_DIR/src')
+from bp_writeback.queue import init_db
+init_db('$BP_STATE/writeback-queue.sqlite')
+" 2>/dev/null && echo "[ok] writeback queue initialized"
+    fi
+    echo "$CURRENT_VERSION" > "$VERSION_FILE"
+    echo "[ok] state migration complete"
+fi
+
+# Soft-required dep for auto-research: beautifulsoup4
+if command -v pip >/dev/null 2>&1; then
+    python3 -c "import bs4" 2>/dev/null \
+        || (pip install --user beautifulsoup4 >/dev/null 2>&1 \
+            && echo "[ok] beautifulsoup4 installed (enables auto-research)" \
+            || echo "[warn] beautifulsoup4 not installed — auto-research will stay disabled")
+fi
+
 # ─── Vault skeleton ──────────────────────────────────────────────────
 mkdir -p "$INSTALL_DIR/vault"/{daily,topics,people,projects,sources}
 
